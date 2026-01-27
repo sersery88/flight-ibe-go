@@ -17,10 +17,17 @@ A production-ready Go backend for Flight Internet Booking Engine with Amadeus Se
 
 ## Tech Stack
 
+**Backend:**
 - **Go 1.22+**
 - **Gin** - HTTP framework
 - **OAuth2** - Amadeus authentication with token caching
 - **Rate Limiting** - Per-IP request throttling
+
+**Frontend:**
+- **Next.js 15** - React framework
+- **TypeScript**
+- **Tailwind CSS**
+- **shadcn/ui** - Component library
 
 ## Quick Start
 
@@ -57,6 +64,16 @@ go run ./cmd/server
 ```
 
 Server starts at `http://localhost:8080`
+
+### 4. Run Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend starts at `http://localhost:3000`
 
 ## API Endpoints
 
@@ -159,18 +176,27 @@ curl "http://localhost:8080/api/flights/status?carrierCode=LX&flightNumber=1&dat
 flight-ibe-go/
 ├── cmd/
 │   └── server/
-│       └── main.go          # Entry point
+│       └── main.go              # Backend entry point
 ├── internal/
 │   ├── amadeus/
-│   │   ├── client.go        # OAuth2 client with token cache
-│   │   └── flights.go       # Amadeus API methods
+│   │   ├── client.go            # OAuth2 client with token cache
+│   │   └── flights.go           # Amadeus API methods
 │   ├── handlers/
-│   │   └── flights.go       # HTTP handlers
+│   │   └── flights.go           # HTTP handlers
 │   ├── middleware/
-│   │   └── ratelimit.go     # Rate limiting, logging
+│   │   └── ratelimit.go         # Rate limiting, logging
 │   └── models/
-│       ├── requests.go      # Request structs
-│       └── responses.go     # Response structs
+│       ├── requests.go          # Request structs
+│       └── responses.go         # Response structs
+├── frontend/                    # Next.js Frontend
+│   ├── src/
+│   │   ├── app/                 # Pages (Next.js App Router)
+│   │   ├── components/          # React components
+│   │   ├── hooks/               # Custom hooks
+│   │   ├── lib/                 # API client, utilities
+│   │   └── types/               # TypeScript types
+│   ├── package.json
+│   └── .env.example
 ├── .env.example
 ├── Dockerfile
 ├── Makefile
