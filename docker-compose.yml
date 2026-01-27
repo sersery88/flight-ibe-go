@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  # Flight IBE Go API Server
+  flight-ibe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENVIRONMENT=development
+      - AMADEUS_CLIENT_ID=${AMADEUS_CLIENT_ID}
+      - AMADEUS_CLIENT_SECRET=${AMADEUS_CLIENT_SECRET}
+      - AMADEUS_ENV=test
+      - CACHE_SIZE=1000
+      - CACHE_TTL=15m
+      - RATE_LIMIT_RPS=10
+      - RATE_LIMIT_BURST=20
+      - ENABLE_TRACING=true
+      - ENABLE_METRICS=true
+      - OTLP_ENDPOINT=jaeger:4318
+      - LOG_LEVEL=debug
+    depends_on:
+      - jaeger
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - flight-ibe-network
+    restart: unless-stopped
+
+  # OpenSearch for Flight Search Indexing
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - plugins.security.disabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - flight-ibe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 | grep -q 'opensearch'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # OpenSearch Dashboards
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.1
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    networks:
+      - flight-ibe-network
+    depends_on:
+      - opensearch
+
+  # Redis for distributed caching (optional, for multi-instance setup)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - flight-ibe-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - flight-ibe-network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - flight-ibe-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "14268:14268"  # Thrift HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - flight-ibe-network
+    restart: unless-stopped
+
+volumes:
+  opensearch-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  flight-ibe-network:
+    driver: bridge

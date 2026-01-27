@@ -1,244 +1,308 @@
-# Flight IBE - Go Backend
+# Flight IBE Go - Enterprise Flight Booking Engine
 
-A production-ready Go backend for Flight Internet Booking Engine with Amadeus Self-Service API integration.
+A high-performance, enterprise-grade Flight Internet Booking Engine built in Go with the Amadeus API. Designed for B2B OTA platforms with a focus on scalability, reliability, and observability.
 
-> **Based on:** [sersery88/flight-ibe](https://github.com/sersery88/flight-ibe) (Rust implementation)  
-> **API Docs:** [sersery88/amadeus-api-docs](https://github.com/sersery88/amadeus-api-docs)
+## 🏗️ Architecture
 
-## Features
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Flight IBE Go                                   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        Interfaces Layer                              │   │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐     │   │
+│  │  │   HTTP Handlers │  │    Middleware   │  │    Router/Mux    │     │   │
+│  │  │   (Gin-based)   │  │ (Auth, CORS,    │  │                  │     │   │
+│  │  │                 │  │  Rate Limit,    │  │                  │     │   │
+│  │  │                 │  │  Tracing, Log)  │  │                  │     │   │
+│  │  └─────────────────┘  └─────────────────┘  └──────────────────┘     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                       Application Layer                              │   │
+│  │  ┌────────────────────────────────────────────────────────────┐     │   │
+│  │  │                     FlightService                           │     │   │
+│  │  │  • Search with caching & request coalescing                 │     │   │
+│  │  │  • Pricing                                                  │     │   │
+│  │  │  • Booking                                                  │     │   │
+│  │  │  • Filtering (via OpenSearch)                               │     │   │
+│  │  └────────────────────────────────────────────────────────────┘     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         Domain Layer                                 │   │
+│  │  ┌──────────────┐  ┌──────────────────────────────────────────┐     │   │
+│  │  │   Entities   │  │             Ports (Interfaces)           │     │   │
+│  │  │ FlightOffer  │  │  FlightSearcher, FlightBooker, Cache,    │     │   │
+│  │  │ Booking      │  │  FlightIndexer, Metrics, HealthChecker   │     │   │
+│  │  │ Traveler     │  │                                          │     │   │
+│  │  └──────────────┘  └──────────────────────────────────────────┘     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      Infrastructure Layer                            │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
+│  │  │   Amadeus   │  │  LRU Cache  │  │  OpenSearch │  │ Prometheus │  │   │
+│  │  │   Adapter   │  │             │  │   Indexer   │  │  Metrics   │  │   │
+│  │  └──────┬──────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
+│  │         │         ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
+│  │         │         │  Coalescer  │  │    OTel     │  │   slog     │  │   │
+│  │         │         │             │  │   Tracing   │  │  Logging   │  │   │
+│  │         │         └─────────────┘  └─────────────┘  └────────────┘  │   │
+│  └─────────┼───────────────────────────────────────────────────────────┘   │
+│            │                                                               │
+└────────────┼───────────────────────────────────────────────────────────────┘
+             │
+             ▼
+    ┌────────────────┐
+    │  Amadeus API   │
+    │  (Self-Service)│
+    └────────────────┘
+```
 
-- 🔍 **Flight Search** - Search flight offers by origin, destination, dates
-- 💰 **Pricing** - Get final pricing with taxes and fees
-- ✈️ **Booking** - Create, retrieve, and cancel flight orders (PNR)
-- 💺 **Seat Maps** - Display aircraft seat maps for seat selection
-- 📊 **Flight Status** - Real-time flight tracking
-- 🌍 **Inspiration** - Find destinations by budget
-- 🏷️ **Reference Data** - Airport/city search, airline lookup
+## ✨ Features
 
-## Tech Stack
+### Core Functionality
+- **Flight Search** - Search for flights with comprehensive filtering
+- **Flight Pricing** - Get real-time pricing for selected offers
+- **Booking** - Create, retrieve, and cancel flight bookings
+- **Location Search** - Airport and city autocomplete
 
-**Backend:**
-- **Go 1.22+**
-- **Gin** - HTTP framework
-- **OAuth2** - Amadeus authentication with token caching
-- **Rate Limiting** - Per-IP request throttling
+### Performance & Reliability
+- **In-Memory LRU Caching** - Fast response times with configurable TTL
+- **Request Coalescing** - Prevents duplicate API calls for identical searches
+- **Connection Pooling** - Efficient HTTP connection reuse
+- **Graceful Shutdown** - Clean shutdown handling
 
-**Frontend:**
-- **Next.js 15** - React framework
-- **TypeScript**
-- **Tailwind CSS**
-- **shadcn/ui** - Component library
+### Observability
+- **Structured Logging (slog)** - JSON-formatted logs with request context
+- **Prometheus Metrics** - Search latency, cache hit rates, API errors
+- **OpenTelemetry Tracing** - Distributed tracing with Jaeger export
+- **Health Checks** - Kubernetes-ready liveness/readiness probes
 
-## Quick Start
+### Security & API
+- **Rate Limiting** - Per-IP request limiting with burst support
+- **CORS** - Configurable cross-origin resource sharing
+- **Request ID** - Traceable request IDs in all responses
+- **API Versioning** - `/api/v1/` prefix for future compatibility
 
-### 1. Clone & Setup
+## 🚀 Quick Start
+
+### Prerequisites
+- Go 1.22+
+- Docker & Docker Compose (optional)
+- Amadeus API credentials ([Get them here](https://developers.amadeus.com))
+
+### Run Locally
 
 ```bash
-git clone https://github.com/sersery88/flight-ibe-go.git
+# Clone the repository
+git clone https://github.com/sersery88/flight-ibe-go
 cd flight-ibe-go
+
+# Copy environment file
 cp .env.example .env
-```
+# Edit .env with your Amadeus credentials
 
-### 2. Get Amadeus Credentials
+# Download dependencies
+make deps
 
-1. Register at [developers.amadeus.com](https://developers.amadeus.com)
-2. Create an application
-3. Copy your API Key and Secret to `.env`:
-
-```env
-AMADEUS_CLIENT_ID=your_api_key
-AMADEUS_CLIENT_SECRET=your_api_secret
-AMADEUS_ENV=test
-```
-
-### 3. Run
-
-```bash
-# Install dependencies
-go mod download
-
-# Run server
+# Run the server
 make run
-# or
-go run ./cmd/server
+
+# Or with debug logging
+make run-dev
 ```
 
-Server starts at `http://localhost:8080`
-
-### 4. Run Frontend
+### Run with Docker Compose
 
 ```bash
-cd frontend
-npm install
-npm run dev
+# Start all services (API, OpenSearch, Prometheus, Grafana, Jaeger)
+make docker-up
+
+# View logs
+make docker-logs
+
+# Stop services
+make docker-down
 ```
 
-Frontend starts at `http://localhost:3000`
+## 🔧 Configuration
 
-## API Endpoints
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `PORT` | Server port | `8080` |
+| `ENVIRONMENT` | Environment name | `development` |
+| `AMADEUS_CLIENT_ID` | Amadeus API client ID | Required |
+| `AMADEUS_CLIENT_SECRET` | Amadeus API client secret | Required |
+| `AMADEUS_ENV` | Amadeus environment (`test`/`production`) | `test` |
+| `CACHE_SIZE` | Maximum cache entries | `1000` |
+| `CACHE_TTL` | Cache time-to-live | `15m` |
+| `RATE_LIMIT_RPS` | Requests per second per IP | `10` |
+| `RATE_LIMIT_BURST` | Burst size for rate limiter | `20` |
+| `ENABLE_TRACING` | Enable OpenTelemetry tracing | `false` |
+| `ENABLE_METRICS` | Enable Prometheus metrics | `true` |
+| `OTLP_ENDPOINT` | OTLP collector endpoint | `` |
+| `LOG_LEVEL` | Log level (`debug`/`info`) | `info` |
 
-### Flight Search & Booking
+## 📡 API Endpoints
 
+### Flight Operations
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/flights/search` | Search flight offers |
-| POST | `/api/flights/price` | Get final pricing |
-| POST | `/api/flights/book` | Create booking (PNR) |
-| GET | `/api/flights/orders/:id` | Get booking details |
-| DELETE | `/api/flights/orders/:id` | Cancel booking |
-| POST | `/api/flights/seatmap` | Get seat map |
-| GET | `/api/flights/status` | Check flight status |
-| GET | `/api/flights/inspirations` | Find destinations |
+| `POST` | `/api/v1/flights/search` | Search for flights |
+| `POST` | `/api/v1/flights/filter` | Filter cached results |
+| `POST` | `/api/v1/flights/price` | Get pricing for offers |
+| `POST` | `/api/v1/flights/book` | Create booking |
+| `GET` | `/api/v1/flights/orders/:id` | Get booking |
+| `DELETE` | `/api/v1/flights/orders/:id` | Cancel booking |
 
-### Reference Data
-
+### Health & Metrics
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/locations?keyword=` | Search airports/cities |
+| `GET` | `/health` | Full health check |
+| `GET` | `/health/live` | Liveness probe |
+| `GET` | `/health/ready` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
 
-### Health Check
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Server status |
-
-## Usage Examples
-
-### Search Flights
+### Example: Search Flights
 
 ```bash
-curl -X POST http://localhost:8080/api/flights/search \
+curl -X POST http://localhost:8080/api/v1/flights/search \
   -H "Content-Type: application/json" \
   -d '{
     "origin": "ZRH",
-    "destination": "BCN",
-    "departureDate": "2026-03-15",
-    "returnDate": "2026-03-22",
-    "adults": 2,
+    "destination": "LHR",
+    "departureDate": "2024-03-15",
+    "adults": 1,
     "travelClass": "ECONOMY",
-    "currency": "EUR"
+    "currency": "CHF"
   }'
 ```
 
-### Price Selected Offer
+## 📊 Monitoring
 
-```bash
-curl -X POST http://localhost:8080/api/flights/price \
-  -H "Content-Type: application/json" \
-  -d '{
-    "flightOffers": [<offer_from_search>]
-  }'
-```
+### Grafana Dashboards
+Access Grafana at `http://localhost:3000` (admin/admin) with pre-configured:
+- Flight IBE Overview dashboard
+- Request latency histograms
+- Cache hit/miss rates
+- API error rates
 
-### Create Booking
+### Prometheus Metrics
+Key metrics exposed at `/metrics`:
+- `flight_ibe_search_requests_total` - Total searches
+- `flight_ibe_search_latency_milliseconds` - Search latency histogram
+- `flight_ibe_cache_hits_total` - Cache hits
+- `flight_ibe_cache_misses_total` - Cache misses
+- `flight_ibe_api_errors_total` - API errors by type
+- `flight_ibe_api_latency_milliseconds` - External API latency
 
-```bash
-curl -X POST http://localhost:8080/api/flights/book \
-  -H "Content-Type: application/json" \
-  -d '{
-    "data": {
-      "type": "flight-order",
-      "flightOffers": [<priced_offer>],
-      "travelers": [{
-        "id": "1",
-        "dateOfBirth": "1990-01-15",
-        "name": {
-          "firstName": "MAX",
-          "lastName": "MUSTERMANN"
-        },
-        "contact": {
-          "emailAddress": "max@example.com",
-          "phones": [{
-            "countryCallingCode": "41",
-            "number": "791234567"
-          }]
-        }
-      }]
-    }
-  }'
-```
+### Jaeger Tracing
+Access Jaeger UI at `http://localhost:16686` to trace requests through the system.
 
-### Search Airports
-
-```bash
-curl "http://localhost:8080/api/locations?keyword=zur"
-```
-
-### Check Flight Status
-
-```bash
-curl "http://localhost:8080/api/flights/status?carrierCode=LX&flightNumber=1&date=2026-03-15"
-```
-
-## Project Structure
+## 🏛️ Project Structure
 
 ```
 flight-ibe-go/
 ├── cmd/
 │   └── server/
-│       └── main.go              # Backend entry point
+│       └── main.go              # Application entry point
 ├── internal/
-│   ├── amadeus/
-│   │   ├── client.go            # OAuth2 client with token cache
-│   │   └── flights.go           # Amadeus API methods
-│   ├── handlers/
-│   │   └── flights.go           # HTTP handlers
-│   ├── middleware/
-│   │   └── ratelimit.go         # Rate limiting, logging
-│   └── models/
-│       ├── requests.go          # Request structs
-│       └── responses.go         # Response structs
-├── frontend/                    # Next.js Frontend
-│   ├── src/
-│   │   ├── app/                 # Pages (Next.js App Router)
-│   │   ├── components/          # React components
-│   │   ├── hooks/               # Custom hooks
-│   │   ├── lib/                 # API client, utilities
-│   │   └── types/               # TypeScript types
-│   ├── package.json
-│   └── .env.example
-├── .env.example
-├── Dockerfile
-├── Makefile
-└── go.mod
+│   ├── domain/                  # Business entities & ports
+│   │   ├── entities.go          # Domain models
+│   │   └── ports.go             # Interface definitions
+│   ├── application/             # Use cases / business logic
+│   │   └── flight_service.go    # Flight service implementation
+│   ├── infrastructure/          # External adapters
+│   │   ├── amadeus/             # Amadeus API adapter
+│   │   ├── cache/               # LRU cache implementation
+│   │   ├── coalesce/            # Request coalescer
+│   │   ├── metrics/             # Prometheus metrics
+│   │   └── observability/       # OpenTelemetry setup
+│   └── interfaces/              # HTTP layer
+│       └── http/
+│           ├── handlers.go      # HTTP handlers
+│           ├── middleware.go    # HTTP middleware
+│           └── router.go        # Route configuration
+├── config/                      # Configuration files
+│   ├── prometheus.yml
+│   └── grafana/
+├── frontend/                    # Optional web UI
+├── docker-compose.yml           # Local development stack
+├── Dockerfile                   # Multi-stage build
+├── Makefile                     # Build automation
+└── README.md
 ```
 
-## Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AMADEUS_CLIENT_ID` | API Key | required |
-| `AMADEUS_CLIENT_SECRET` | API Secret | required |
-| `AMADEUS_ENV` | `test` or `production` | `test` |
-| `PORT` | Server port | `8080` |
-| `GIN_MODE` | `debug` or `release` | `debug` |
-
-## Docker
+## 🧪 Testing
 
 ```bash
-# Build
-docker build -t flight-ibe-go .
+# Run all tests
+make test
 
-# Run
-docker run -p 8080:8080 \
-  -e AMADEUS_CLIENT_ID=xxx \
-  -e AMADEUS_CLIENT_SECRET=xxx \
-  flight-ibe-go
+# Run with coverage
+make test-coverage
+
+# Run benchmarks
+make benchmark
 ```
 
-## Production Notes
+## 🔐 Production Deployment
 
-1. **Environment**: Set `AMADEUS_ENV=production` for live data (paid)
-2. **Rate Limits**: Amadeus test: 10 req/s, production: varies by plan
-3. **Token Caching**: Tokens auto-refresh with 2-minute buffer
-4. **CORS**: Configure `AllowOrigins` for your frontend domain
+### Kubernetes
+The service is Kubernetes-ready with:
+- Liveness probe: `GET /health/live`
+- Readiness probe: `GET /health/ready`
+- Metrics endpoint: `GET /metrics`
+- Graceful shutdown handling
 
-## Related Projects
+### Environment Variables for Production
+```bash
+ENVIRONMENT=production
+AMADEUS_ENV=production
+ENABLE_TRACING=true
+OTLP_ENDPOINT=otel-collector:4318
+RATE_LIMIT_RPS=100
+CACHE_SIZE=10000
+```
 
-- [flight-ibe](https://github.com/sersery88/flight-ibe) - Rust backend + React frontend
-- [amadeus-api-docs](https://github.com/sersery88/amadeus-api-docs) - Go-focused API documentation
-- [ETG-Hotel-IBE](https://github.com/sersery88/ETG-Hotel-IBE) - Hotel booking engine
+## 📈 Performance Considerations
 
-## License
+### Caching Strategy
+- **15-minute TTL** - Flight prices change frequently
+- **LRU eviction** - Keeps frequently accessed routes cached
+- **Request coalescing** - Prevents thundering herd on cache miss
 
-MIT
+### Recommended Setup (Single Server)
+- **Memory**: 2GB+ (cache size depends on traffic)
+- **CPU**: 2+ cores
+- **Network**: Low-latency connection to Amadeus API
+
+### For High Traffic
+Consider:
+- Redis for distributed caching
+- OpenSearch for advanced filtering
+- Horizontal scaling with sticky sessions
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- [Amadeus for Developers](https://developers.amadeus.com) - Flight API
+- [Gin Web Framework](https://gin-gonic.com) - HTTP routing
+- [OpenTelemetry](https://opentelemetry.io) - Observability
+- [Prometheus](https://prometheus.io) - Metrics
