@@ -64,11 +64,16 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
   };
 
   // Initialize with one additional leg when switching to multicity
+  // Using specific values instead of store object to avoid unnecessary re-renders
+  const tripType = store.tripType;
+  const additionalLegsCount = store.additionalLegs.length;
+  const addLeg = store.addLeg;
+  
   useEffect(() => {
-    if (store.tripType === 'multicity' && store.additionalLegs.length === 0) {
-      store.addLeg();
+    if (tripType === 'multicity' && additionalLegsCount === 0) {
+      addLeg();
     }
-  }, [store.tripType, store.additionalLegs.length, store]);
+  }, [tripType, additionalLegsCount, addLeg]);
 
   return (
     <div className={cn('space-y-5', className)}>
@@ -130,8 +135,9 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
                   type="button"
                   onClick={handleSwapLocations}
                   className="flex h-8 w-8 items-center justify-center rounded-full border bg-background shadow-sm transition-all active:scale-95 hover:bg-accent hover:shadow"
+                  aria-label="Abflug- und Zielflughafen tauschen"
                 >
-                  <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                  <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                 </button>
               </div>
 
@@ -171,11 +177,12 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
                 className="w-full gap-2 rounded-xl bg-primary px-6 hover:bg-primary/90 md:w-auto"
                 onClick={handleSearch}
                 disabled={isPending || !store.origin || !store.destination || !store.departureDate}
+                aria-label="Flüge suchen"
               >
                 {isPending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Search className="h-5 w-5" />
+                  <Search className="h-5 w-5" aria-hidden="true" />
                 )}
                 <span className="md:hidden lg:inline">Suchen</span>
               </Button>
@@ -299,8 +306,9 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
                         type="button"
                         onClick={() => store.removeLeg(index)}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors active:scale-95 hover:bg-accent hover:text-foreground"
+                        aria-label={`Flug ${index + 2} entfernen`}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -315,8 +323,9 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
               type="button"
               onClick={() => store.addLeg()}
               className="flex items-center justify-center gap-2 rounded-full bg-muted px-5 py-2 text-sm font-medium text-muted-foreground transition-colors active:scale-95 hover:bg-accent hover:text-foreground sm:justify-start"
+              aria-label="Weiteren Flug zur Reise hinzufügen"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               Flug hinzufügen
             </button>
 
@@ -325,11 +334,12 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
               className="w-full gap-2 rounded-xl bg-primary px-8 hover:bg-primary/90 sm:w-auto"
               onClick={handleSearch}
               disabled={isPending || !store.origin || !store.destination || !store.departureDate}
+              aria-label="Multi-City Flüge suchen"
             >
               {isPending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
               ) : (
-                <Search className="h-5 w-5" />
+                <Search className="h-5 w-5" aria-hidden="true" />
               )}
               Suchen
             </Button>
