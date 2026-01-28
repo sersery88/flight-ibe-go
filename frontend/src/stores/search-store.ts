@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, devtools, createJSONStorage } from 'zustand/middleware';
+import { useEffect, useState } from 'react';
 import type { FlightSearchRequest, FlightOffer, TravelClass } from '@/types/flight';
 
 // ============================================================================
@@ -202,3 +203,50 @@ export const useSearchStore = create<SearchState>()(
     { name: 'SearchStore', enabled: process.env.NODE_ENV === 'development' }
   )
 );
+
+// ============================================================================
+// Hydration Hook - Must be called in a client component to rehydrate store
+// ============================================================================
+
+/**
+ * Hook to handle Zustand store hydration for Next.js SSR compatibility.
+ * Call this in your root layout or a provider component.
+ * 
+ * @example
+ * ```tsx
+ * // In a client component:
+ * function StoreHydration() {
+ *   useSearchStoreHydration();
+ *   return null;
+ * }
+ * ```
+ */
+export function useSearchStoreHydration() {
+  useEffect(() => {
+    useSearchStore.persist.rehydrate();
+  }, []);
+}
+
+/**
+ * Check if the store has been hydrated from localStorage.
+ * Useful for preventing hydration mismatches.
+ */
+export function useIsSearchStoreHydrated() {
+  const [isHydrated, setIsHydrated] = useState(false);
+  
+  useEffect(() => {
+    // Check if already hydrated
+    const unsubFinishHydration = useSearchStore.persist.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+    
+    // Trigger hydration
+    useSearchStore.persist.rehydrate();
+    
+    return () => {
+      unsubFinishHydration();
+    };
+  }, []);
+  
+  return isHydrated;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { Plane, Clock, Luggage, ChevronRight, ChevronDown, ChevronUp, Check, X, Loader2, Leaf, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { getUpsellOffers } from '@/lib/api-client';
+import { useUpsellOffers } from '@/hooks/use-upsell-offers';
 import { formatBrandedFareName, translateAmenity } from '@/lib/amenities';
 import { formatAircraftType } from '@/lib/aircraft';
 import { formatAirlineName } from '@/lib/airlines';
@@ -83,32 +83,38 @@ interface FlightCardProps {
 export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected, className }: FlightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFareSelection, setShowFareSelection] = useState(false);
-  const [upsellOffers, setUpsellOffers] = useState<FlightOffer[]>([]);
-  const [isLoadingUpsell, setIsLoadingUpsell] = useState(false);
-  const [upsellFailed, setUpsellFailed] = useState(false);
   const [selectedFareOffer, setSelectedFareOffer] = useState<FlightOffer>(offer);
+
+  // Use the extracted upsell offers hook
+  const { 
+    isLoading: isLoadingUpsell, 
+    hasFailed: upsellFailed, 
+    hasMultipleFares, 
+    allFareOptions 
+  } = useUpsellOffers(offer, { enabled: showFareSelection });
 
   const outbound = offer.itineraries[0];
   const returnFlight = offer.itineraries[1];
 
   // Format outbound date for details
-  const formattedDepartureDate = new Date(outbound.segments[0]?.departure.at).toLocaleDateString('de-DE', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short'
-  });
-
-  // Collect all segments for detail view
-  const allSegments = [
-    ...outbound.segments,
-    ...(returnFlight?.segments || [])
-  ];
+  const formattedDepartureDate = useMemo(() => 
+    new Date(outbound.segments[0]?.departure.at).toLocaleDateString('de-DE', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    }), [outbound.segments]);
 
   // Calculate total CO2 for entire journey
-  const totalJourneyCo2 = allSegments.reduce((sum, seg) => {
-    const segmentCo2 = seg.co2Emissions?.reduce((s, e) => s + e.weight, 0) || 0;
-    return sum + segmentCo2;
-  }, 0);
+  const totalJourneyCo2 = useMemo(() => {
+    const allSegments = [
+      ...outbound.segments,
+      ...(returnFlight?.segments || [])
+    ];
+    return allSegments.reduce((sum, seg) => {
+      const segmentCo2 = seg.co2Emissions?.reduce((s, e) => s + e.weight, 0) || 0;
+      return sum + segmentCo2;
+    }, 0);
+  }, [outbound.segments, returnFlight?.segments]);
 
   const outboundSegmentCount = outbound.segments.length;
 
@@ -120,33 +126,8 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
   const brandedFareName = selectedFareDetail?.brandedFareLabel || selectedFareDetail?.brandedFare;
   const cabinClass = selectedFareDetail?.cabin || 'ECONOMY';
 
-  // Check if multiple fare options are available
-  const hasMultipleFares = upsellOffers.length > 1;
-
-  // Load upsell offers when fare selection is opened
-  useEffect(() => {
-    if (showFareSelection && upsellOffers.length === 0 && !isLoadingUpsell && !upsellFailed) {
-      setIsLoadingUpsell(true);
-      getUpsellOffers([offer])
-        .then((response) => {
-          if (response.data && response.data.length > 1) {
-            setUpsellOffers(response.data);
-          } else {
-            setUpsellFailed(true);
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to load upsell offers:', error);
-          setUpsellFailed(true);
-        })
-        .finally(() => {
-          setIsLoadingUpsell(false);
-        });
-    }
-  }, [showFareSelection, offer, upsellOffers.length, isLoadingUpsell, upsellFailed]);
-
   // Click on card toggles flight details
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
     if (
       (e.target as HTMLElement).closest('button') ||
       (e.target as HTMLElement).closest('[data-fare-tile]') ||
@@ -155,43 +136,21 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
     ) {
       return;
     }
-    setIsExpanded(!isExpanded);
-  };
+    setIsExpanded(prev => !prev);
+  }, []);
 
-  const handleSelectFare = (fareOffer: FlightOffer) => {
+  const handleSelectFare = useCallback((fareOffer: FlightOffer) => {
     setSelectedFareOffer(fareOffer);
-  };
+  }, []);
 
-  const handleConfirmSelection = () => {
+  const handleConfirmSelection = useCallback(() => {
     onSelect(selectedFareOffer);
-  };
+  }, [onSelect, selectedFareOffer]);
 
-  const handleOpenFareSelection = (e: React.MouseEvent) => {
+  const handleOpenFareSelection = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowFareSelection(!showFareSelection);
-  };
-
-  // Combine original offer with upsell offers for fare selection
-  const allFareOptions = useMemo(() => {
-    if (upsellOffers.length === 0) return [offer];
-
-    const fareMap = new Map<string, FlightOffer>();
-    const originalFare = offer.travelerPricings[0]?.fareDetailsBySegment[0]?.brandedFare || 'ORIGINAL';
-    fareMap.set(originalFare, offer);
-
-    for (const upsellOffer of upsellOffers) {
-      const fareCode = upsellOffer.travelerPricings[0]?.fareDetailsBySegment[0]?.brandedFare || upsellOffer.id;
-      const existing = fareMap.get(fareCode);
-
-      if (!existing || parseFloat(upsellOffer.price.total) < parseFloat(existing.price.total)) {
-        fareMap.set(fareCode, upsellOffer);
-      }
-    }
-
-    return Array.from(fareMap.values()).sort(
-      (a, b) => parseFloat(a.price.total) - parseFloat(b.price.total)
-    );
-  }, [offer, upsellOffers]);
+    setShowFareSelection(prev => !prev);
+  }, []);
 
   return (
     <div className="w-full">
@@ -359,10 +318,11 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
                   e.stopPropagation();
                   handleConfirmSelection();
                 }}
+                aria-label={`Flug auswählen: ${outbound.segments[0].departure.iataCode} nach ${outbound.segments[outbound.segments.length - 1].arrival.iataCode}`}
               >
                 <span className="hidden sm:inline">Auswählen</span>
                 <span className="sm:hidden">Wählen</span>
-                <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
               </Button>
             </div>
           </div>
