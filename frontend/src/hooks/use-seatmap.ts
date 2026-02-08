@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getSeatmaps } from '@/lib/api-client';
+import { getSeatmaps, getSeatmapByOrder } from '@/lib/api-client';
 import type { FlightOffer } from '@/types/seatmap';
 
 /**
@@ -20,4 +20,36 @@ export function useSeatmap(offer: FlightOffer | null) {
     gcTime: 10 * 60 * 1000, // 10 min garbage collection
     retry: 1,
   });
+}
+
+/**
+ * Seatmap hook that uses PNR-based loading (order ID).
+ * Falls back to offer-based loading if no orderId is provided.
+ */
+export function useSeatmapByOrder(
+  orderId: string | null,
+  offer: FlightOffer | null
+) {
+  // PNR-based seatmap (preferred when we have an order)
+  const orderQuery = useQuery({
+    queryKey: ['seatmap-order', orderId],
+    queryFn: () => getSeatmapByOrder(orderId!),
+    enabled: !!orderId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+
+  // Offer-based fallback
+  const offerQuery = useQuery({
+    queryKey: ['seatmap', offer?.id ?? null],
+    queryFn: () => getSeatmaps(offer ? [offer] : []),
+    enabled: !!offer && !orderId, // Only if no orderId
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+
+  // Return order query if we have orderId, otherwise offer query
+  return orderId ? orderQuery : offerQuery;
 }
