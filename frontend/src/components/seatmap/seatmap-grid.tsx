@@ -128,6 +128,8 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
   const config = deck.deckConfiguration;
   const wingStart = config?.startWingsRow ?? 0;
   const wingEnd = config?.endWingsRow ?? 0;
+
+  // exitRowsX contains X-coordinates (same coordinate system as seat.coordinates.x)
   const exitRows = useMemo(() => new Set(config?.exitRowsX ?? []), [config?.exitRowsX]);
 
   const aisleGridCols = useMemo(() => {
@@ -268,7 +270,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             );
           })}
 
-          {/* Exit row indicator stripes */}
+          {/* Exit row indicator — subtle background behind exit-row seats */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
             const isExit = exitRows.has(rowNum);
             if (!isExit) return null;
@@ -276,7 +278,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             return (
               <div
                 key={`exit-bg-${rowNum}`}
-                className="absolute inset-x-0 border-t-2 border-amber-400/60 dark:border-amber-500/40 pointer-events-none"
+                className="bg-amber-400/10 dark:bg-amber-500/10 rounded-sm pointer-events-none"
                 style={{
                   gridRow,
                   gridColumn: `2 / ${rightLabelCol}`,
