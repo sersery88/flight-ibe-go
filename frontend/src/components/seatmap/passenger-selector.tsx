@@ -54,8 +54,8 @@ export function PassengerSelector({
               'border-2 min-h-[40px]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-pink-400',
               isActive
-                ? 'bg-white shadow-md'
-                : 'bg-muted/50 hover:bg-muted border-transparent',
+                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-md'
+                : 'bg-muted/50 hover:bg-muted border-transparent text-gray-700 dark:text-gray-300',
             ].join(' ')}
             style={{
               borderColor: isActive ? color : 'transparent',
