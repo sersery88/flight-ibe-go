@@ -38,13 +38,13 @@ const STATIC_ITEMS: StaticLegendItem[] = [
 // ============================================================================
 
 const FILTERABLE_CATEGORIES: SeatCategory[] = [
+  'standard',
   'exit',
   'preferred',
   'extraleg',
   'bulkhead',
   'bassinet',
   'accessible',
-  'pet',
 ];
 
 // ============================================================================

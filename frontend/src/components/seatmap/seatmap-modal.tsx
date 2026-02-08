@@ -147,7 +147,7 @@ export function SeatmapModal({
   );
   const [exitRowDialogOpen, setExitRowDialogOpen] = useState(false);
   const [pendingExitSeat, setPendingExitSeat] = useState<Seat | null>(null);
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(true);
 
   // --- New states for v3 ---
   const [activeFilter, setActiveFilter] = useState<SeatCategory | null>(null);
@@ -499,7 +499,7 @@ export function SeatmapModal({
                     className="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
                   >
                     <span>
-                      Legende
+                      Filter
                       {activeFilter && (
                         <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
                           Filter aktiv

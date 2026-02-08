@@ -133,7 +133,8 @@ export const CATEGORY_STYLES: Record<SeatCategory, CategoryStyle> = {
     bg: 'bg-sky-400',
     text: 'text-white',
     ring: 'ring-sky-300',
-    label: 'Standard',
+    icon: '💺',
+    label: 'Normale Sitzplätze',
     filterKey: 'standard',
   },
 };
