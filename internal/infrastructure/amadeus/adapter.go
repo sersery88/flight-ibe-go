@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
+	"regexp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -592,69 +594,223 @@ func (a *Adapter) parseServiceOptions(body []byte) []domain.ServiceOption {
 	return services
 }
 
-// parseFareRules extracts fare rules from the pricing response
+// parseFareRules extracts fare rules from the pricing response.
+// The Amadeus API returns detailed-fare-rules as a map (object with string keys),
+// each entry containing fareNotes.descriptions[] with descriptionType and text.
 func (a *Adapter) parseFareRules(body []byte) []domain.FareRuleGroup {
 	var fareRules []domain.FareRuleGroup
 
 	var parsed struct {
 		Included *struct {
-			DetailedFareRules []struct {
-				FareNotes []struct {
-					SegmentID string `json:"segmentId,omitempty"`
-					Rules     []struct {
-						Category   string `json:"category"`
-						NotApplicable bool `json:"notApplicable,omitempty"`
-						MaxPenaltyAmount string `json:"maxPenaltyAmount,omitempty"`
-						Currency         string `json:"currency,omitempty"`
-						Descriptions     []struct {
-							Text string `json:"text"`
-						} `json:"descriptions,omitempty"`
-					} `json:"rules,omitempty"`
+			DetailedFareRules map[string]struct {
+				FareBasis string `json:"fareBasis,omitempty"`
+				Name      string `json:"name,omitempty"`
+				SegmentID string `json:"segmentId,omitempty"`
+				FareNotes struct {
+					Descriptions []struct {
+						DescriptionType string `json:"descriptionType"`
+						Text            string `json:"text"`
+					} `json:"descriptions,omitempty"`
 				} `json:"fareNotes,omitempty"`
 			} `json:"detailed-fare-rules,omitempty"`
 		} `json:"included,omitempty"`
 	}
 
 	if err := json.Unmarshal(body, &parsed); err != nil {
+		a.logger.Warn("parseFareRules: unmarshal error", slog.String("error", err.Error()))
 		return fareRules
 	}
 
-	if parsed.Included == nil {
+	if parsed.Included == nil || len(parsed.Included.DetailedFareRules) == 0 {
 		return fareRules
 	}
 
 	for _, dfr := range parsed.Included.DetailedFareRules {
-		for _, fn := range dfr.FareNotes {
-			group := domain.FareRuleGroup{
-				SegmentID: fn.SegmentID,
+		group := domain.FareRuleGroup{
+			SegmentID: dfr.SegmentID,
+		}
+
+		for _, desc := range dfr.FareNotes.Descriptions {
+			if strings.EqualFold(desc.DescriptionType, "PENALTIES") {
+				rules := parsePenaltyText(desc.Text)
+				group.Rules = append(group.Rules, rules...)
 			}
-			for _, r := range fn.Rules {
-				penalty := 0.0
-				if r.MaxPenaltyAmount != "" {
-					fmt.Sscanf(r.MaxPenaltyAmount, "%f", &penalty)
-				}
-				desc := ""
-				for _, d := range r.Descriptions {
-					if desc != "" {
-						desc += "; "
-					}
-					desc += d.Text
-				}
+		}
+
+		// If no PENALTIES description found, still add other descriptions as generic rules
+		if len(group.Rules) == 0 {
+			for _, desc := range dfr.FareNotes.Descriptions {
 				group.Rules = append(group.Rules, domain.FareRule{
-					Category:      r.Category,
-					NotApplicable: r.NotApplicable,
-					MaxPenalty:    penalty,
-					Currency:      r.Currency,
-					Description:   desc,
+					Category:    desc.DescriptionType,
+					Description: desc.Text,
 				})
 			}
-			if len(group.Rules) > 0 {
-				fareRules = append(fareRules, group)
-			}
+		}
+
+		if len(group.Rules) > 0 {
+			fareRules = append(fareRules, group)
 		}
 	}
 
 	return fareRules
+}
+
+// penaltyAmountRe matches patterns like "CHARGE USD 210.00" or "CHARGE EUR 50.00"
+var penaltyAmountRe = regexp.MustCompile(`CHARGE\s+([A-Z]{3})\s+([\d]+(?:\.[\d]+)?)`)
+
+// parsePenaltyText parses the free-text PENALTIES block from Amadeus fare rules
+// and extracts CANCELLATION, CHANGES, and NO_SHOW rules.
+func parsePenaltyText(text string) []domain.FareRule {
+	var rules []domain.FareRule
+
+	lines := strings.Split(text, "\n")
+
+	// Track which section we're in: "CANCELLATIONS" or "CHANGES"
+	section := ""
+	var sectionLines []string
+
+	flushSection := func() {
+		if section == "" || len(sectionLines) == 0 {
+			return
+		}
+		joined := strings.Join(sectionLines, "\n")
+
+		// Determine category and extract fees
+		switch {
+		case strings.Contains(section, "CANCELLATION"):
+			cancelRule, noShowRule := extractPenaltyFromSection(joined, "CANCELLATION")
+			if cancelRule != nil {
+				rules = append(rules, *cancelRule)
+			}
+			if noShowRule != nil {
+				rules = append(rules, *noShowRule)
+			}
+		case strings.Contains(section, "CHANGE"):
+			changeRule, noShowRule := extractPenaltyFromSection(joined, "CHANGES")
+			if changeRule != nil {
+				rules = append(rules, *changeRule)
+			}
+			if noShowRule != nil {
+				// Only add no-show from changes if we don't already have one
+				hasNoShow := false
+				for _, r := range rules {
+					if r.Category == "NO_SHOW" {
+						hasNoShow = true
+						break
+					}
+				}
+				if !hasNoShow {
+					rules = append(rules, *noShowRule)
+				}
+			}
+		}
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		upper := strings.ToUpper(trimmed)
+
+		// Detect section headers
+		if upper == "CANCELLATIONS" || upper == "CANCELLATION" {
+			flushSection()
+			section = "CANCELLATIONS"
+			sectionLines = nil
+			continue
+		}
+		if upper == "CHANGES" || upper == "CHANGE" {
+			flushSection()
+			section = "CHANGES"
+			sectionLines = nil
+			continue
+		}
+
+		if section != "" && trimmed != "" {
+			sectionLines = append(sectionLines, trimmed)
+		}
+	}
+	flushSection()
+
+	// If we couldn't parse structured sections, create a generic PENALTIES rule
+	if len(rules) == 0 && strings.TrimSpace(text) != "" {
+		rules = append(rules, domain.FareRule{
+			Category:    "PENALTIES",
+			Description: text,
+		})
+	}
+
+	return rules
+}
+
+// extractPenaltyFromSection extracts the main penalty and no-show penalty from a section's lines.
+// Returns (mainRule, noShowRule) — either may be nil.
+func extractPenaltyFromSection(sectionText string, category string) (*domain.FareRule, *domain.FareRule) {
+	var mainRule *domain.FareRule
+	var noShowRule *domain.FareRule
+
+	lines := strings.Split(sectionText, "\n")
+	var mainFee, mainCurrency string
+	var noShowFee, noShowCurrency string
+	maxPenalty := 0.0
+	noShowPenalty := 0.0
+
+	for _, line := range lines {
+		upper := strings.ToUpper(line)
+
+		matches := penaltyAmountRe.FindStringSubmatch(upper)
+		if len(matches) < 3 {
+			continue
+		}
+		currency := matches[1]
+		amount := 0.0
+		fmt.Sscanf(matches[2], "%f", &amount)
+
+		if strings.Contains(upper, "NO-SHOW") || strings.Contains(upper, "NO SHOW") {
+			if amount > noShowPenalty {
+				noShowPenalty = amount
+				noShowCurrency = currency
+				noShowFee = line
+			}
+		} else {
+			if amount > maxPenalty {
+				maxPenalty = amount
+				mainCurrency = currency
+				mainFee = line
+			}
+		}
+	}
+
+	if mainFee != "" || maxPenalty > 0 {
+		mainRule = &domain.FareRule{
+			Category:    category,
+			MaxPenalty:  math.Round(maxPenalty*100) / 100,
+			Currency:    mainCurrency,
+			Description: strings.TrimSpace(mainFee),
+		}
+	} else {
+		// Section exists but no charge found — might be "NOT PERMITTED" or free
+		notApplicable := false
+		desc := sectionText
+		upper := strings.ToUpper(sectionText)
+		if strings.Contains(upper, "NOT PERMITTED") || strings.Contains(upper, "NON-REFUNDABLE") {
+			notApplicable = true
+		}
+		mainRule = &domain.FareRule{
+			Category:      category,
+			NotApplicable: notApplicable,
+			Description:   strings.TrimSpace(desc),
+		}
+	}
+
+	if noShowFee != "" || noShowPenalty > 0 {
+		noShowRule = &domain.FareRule{
+			Category:    "NO_SHOW",
+			MaxPenalty:  math.Round(noShowPenalty*100) / 100,
+			Currency:    noShowCurrency,
+			Description: strings.TrimSpace(noShowFee),
+		}
+	}
+
+	return mainRule, noShowRule
 }
 
 // parseCreditCardFees extracts credit card fees from the pricing response
