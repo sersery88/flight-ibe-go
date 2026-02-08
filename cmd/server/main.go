@@ -21,6 +21,7 @@ import (
 	"github.com/sersery88/flight-ibe-go/internal/infrastructure/coalesce"
 	"github.com/sersery88/flight-ibe-go/internal/infrastructure/metrics"
 	"github.com/sersery88/flight-ibe-go/internal/infrastructure/observability"
+	"github.com/sersery88/flight-ibe-go/internal/infrastructure/ordertracker"
 	httpHandler "github.com/sersery88/flight-ibe-go/internal/interfaces/http"
 )
 
@@ -132,6 +133,9 @@ func run(logger *slog.Logger) error {
 		},
 	)
 
+	// Initialize order tracker for stale PNR cleanup
+	tracker := ordertracker.New()
+
 	// Initialize health checks
 	healthChecks := []domain.HealthChecker{
 		&amadeusHealthCheck{adapter: amadeusAdapter},
@@ -145,6 +149,7 @@ func run(logger *slog.Logger) error {
 		SeatmapProvider:  amadeusAdapter,
 		FlightSearcher:   amadeusAdapter, // Booking flow: pricing with ancillaries
 		FlightBooker:     amadeusAdapter, // Booking flow: PNR creation
+		OrderTracker:     tracker,        // PNR lifecycle tracking
 		HealthChecks:     healthChecks,
 		RateLimitRPS:   config.RateLimitRPS,
 		RateLimitBurst: config.RateLimitBurst,
@@ -169,6 +174,39 @@ func run(logger *slog.Logger) error {
 		logger.Info("starting HTTP server", slog.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErrors <- err
+		}
+	}()
+
+	// Stale PNR cleanup goroutine — cancel abandoned orders every 5 minutes
+	cleanupCtx, cleanupCancel := context.WithCancel(ctx)
+	defer cleanupCancel()
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-cleanupCtx.Done():
+				return
+			case <-ticker.C:
+				stale := tracker.GetStale(15 * time.Minute)
+				if len(stale) > 0 {
+					logger.Info("auto-cancelling stale PNRs",
+						slog.Int("count", len(stale)),
+					)
+				}
+				for _, orderID := range stale {
+					logger.Info("auto-cancelling stale PNR",
+						slog.String("orderId", orderID),
+					)
+					if err := amadeusAdapter.CancelOrder(context.Background(), orderID); err != nil {
+						logger.Warn("failed to auto-cancel stale PNR",
+							slog.String("orderId", orderID),
+							slog.String("error", err.Error()),
+						)
+					}
+					tracker.Remove(orderID)
+				}
+			}
 		}
 	}()
 

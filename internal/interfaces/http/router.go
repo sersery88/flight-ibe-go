@@ -24,6 +24,7 @@ type RouterConfig struct {
 	// Booking flow dependencies
 	FlightSearcher domain.FlightSearcher
 	FlightBooker   domain.FlightBooker
+	OrderTracker   OrderTracker
 	
 	// Health checks
 	HealthChecks []domain.HealthChecker
@@ -112,7 +113,7 @@ func NewRouter(config RouterConfig) *gin.Engine {
 	// Order handler for booking flow (optional — only registered if dependencies are available)
 	var orderHandler *OrderHandler
 	if config.FlightSearcher != nil && config.FlightBooker != nil && config.SeatmapProvider != nil {
-		orderHandler = NewOrderHandler(config.FlightSearcher, config.FlightBooker, config.SeatmapProvider, config.Logger)
+		orderHandler = NewOrderHandler(config.FlightSearcher, config.FlightBooker, config.SeatmapProvider, config.OrderTracker, config.Logger)
 	}
 
 	// API v1

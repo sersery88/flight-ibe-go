@@ -100,9 +100,11 @@ function BookingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 print:bg-white">
       {/* Progress Bar */}
-      <ProgressBar currentStep={currentStep} onStepClick={handleStepClick} />
+      <div className="no-print">
+        <ProgressBar currentStep={currentStep} onStepClick={handleStepClick} />
+      </div>
 
       {/* Step Content */}
       <AnimatePresence mode="wait">

@@ -492,20 +492,29 @@ type HealthResponse struct {
 
 // === Order Handler (Booking Flow) ===
 
+// OrderTracker is the interface for tracking PNR lifecycle.
+type OrderTracker interface {
+	Track(orderID string)
+	Confirm(orderID string)
+	Remove(orderID string)
+}
+
 // OrderHandler handles booking flow order-related HTTP requests
 type OrderHandler struct {
 	searcher domain.FlightSearcher
 	booker   domain.FlightBooker
 	seatmap  domain.SeatmapProvider
+	tracker  OrderTracker
 	logger   *slog.Logger
 }
 
 // NewOrderHandler creates a new OrderHandler
-func NewOrderHandler(searcher domain.FlightSearcher, booker domain.FlightBooker, seatmap domain.SeatmapProvider, logger *slog.Logger) *OrderHandler {
+func NewOrderHandler(searcher domain.FlightSearcher, booker domain.FlightBooker, seatmap domain.SeatmapProvider, tracker OrderTracker, logger *slog.Logger) *OrderHandler {
 	return &OrderHandler{
 		searcher: searcher,
 		booker:   booker,
 		seatmap:  seatmap,
+		tracker:  tracker,
 		logger:   logger,
 	}
 }
@@ -606,6 +615,11 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		slog.String("pnr", response.PNRReference),
 	)
 
+	// Track the order for stale PNR cleanup
+	if h.tracker != nil {
+		h.tracker.Track(response.OrderID)
+	}
+
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -667,13 +681,46 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 		slog.String("orderId", orderID),
 	)
 
+	// Remove from tracker
+	if h.tracker != nil {
+		h.tracker.Remove(orderID)
+	}
+
 	c.JSON(http.StatusOK, SuccessResponse{Message: "order cancelled successfully"})
 }
 
 // CancelOrderBeacon cancels a booking order (POST variant for sendBeacon)
+// Always returns 204 — fire-and-forget for navigator.sendBeacon
 // POST /api/flights/order/:id/cancel
 func (h *OrderHandler) CancelOrderBeacon(c *gin.Context) {
-	h.CancelOrder(c)
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "cancelling booking order via beacon",
+		slog.String("orderId", orderID),
+	)
+
+	if err := h.booker.CancelOrder(c.Request.Context(), orderID); err != nil {
+		// Log but still return 204 — fire-and-forget for sendBeacon
+		h.logger.WarnContext(c.Request.Context(), "beacon cancel order failed (non-critical)",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+	} else {
+		h.logger.InfoContext(c.Request.Context(), "booking order cancelled via beacon",
+			slog.String("orderId", orderID),
+		)
+	}
+
+	// Remove from tracker
+	if h.tracker != nil {
+		h.tracker.Remove(orderID)
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // GetSeatmapByOrder retrieves seatmap for a booking order

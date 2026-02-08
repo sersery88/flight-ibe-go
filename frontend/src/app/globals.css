@@ -261,3 +261,43 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================================
+   Print Styles — Booking Confirmation
+   ============================================================================ */
+@media print {
+  /* Hide interactive elements and navigation */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Clean layout */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove shadows and fix borders */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Page break control */
+  .print-break {
+    page-break-after: always;
+  }
+
+  /* Ensure content fills page width */
+  .mx-auto {
+    max-width: 100% !important;
+  }
+
+  /* Hide header/footer navigation */
+  header,
+  nav,
+  footer {
+    display: none !important;
+  }
+}
