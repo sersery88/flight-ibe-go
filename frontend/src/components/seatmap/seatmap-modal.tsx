@@ -18,6 +18,7 @@ import {
   SelectionSummary,
   ExitRowDialog,
   NoSeatmapFallback,
+  AvailableSeatsCounter,
 } from '@/components/seatmap';
 import type { TravelerInfo } from '@/components/seatmap/passenger-selector';
 import { useSeatmap } from '@/hooks/use-seatmap';
@@ -391,6 +392,13 @@ export function SeatmapModal({
                 </div>
               )}
 
+              {/* Available Seats Counter */}
+              {!isLoading && !isError && activeSegment?.availableSeatsCounters && (
+                <div className="px-4 pb-2 md:px-6">
+                  <AvailableSeatsCounter counters={activeSegment.availableSeatsCounters} />
+                </div>
+              )}
+
               {/* Passenger Selector */}
               {eligibleTravelers.length > 0 && !isLoading && !isError && activeSegment && (
                 <div className="px-4 pb-3 md:px-6">
@@ -421,6 +429,7 @@ export function SeatmapModal({
                   activeTravelerId={activeTravelerId}
                   onSeatSelect={handleSeatSelect}
                   travelerIndexMap={travelerIndexMap}
+                  amenities={activeSegment?.aircraftCabinAmenities}
                 />
               )}
             </div>

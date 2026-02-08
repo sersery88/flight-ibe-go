@@ -148,7 +148,27 @@ export const useBookingFlowStore = create<BookingFlowState>()(
           }
         },
 
-        setOffer: (offer) => set({ offer }, false, 'setOffer'),
+        setOffer: (offer) => {
+          // Clear stale data from previous offer
+          const prev = get().offer;
+          if (prev && prev.id !== offer.id) {
+            // Clear seat selections from the seat-selection-store
+            try {
+              const { clearAll } = require('@/stores/seat-selection-store').useSeatSelectionStore.getState();
+              clearAll();
+            } catch { /* ignore if store not available */ }
+          }
+          set({
+            offer,
+            // Reset downstream state when offer changes
+            orderId: prev && prev.id !== offer.id ? null : get().orderId,
+            pnrReference: prev && prev.id !== offer.id ? null : get().pnrReference,
+            pricingResult: prev && prev.id !== offer.id ? null : get().pricingResult,
+            seatSelections: prev && prev.id !== offer.id ? {} : get().seatSelections,
+            ancillaries: prev && prev.id !== offer.id ? [] : get().ancillaries,
+            currentStep: prev && prev.id !== offer.id ? 1 : get().currentStep,
+          }, false, 'setOffer');
+        },
 
         setTravelers: (travelers) => set({ travelers }, false, 'setTravelers'),
 

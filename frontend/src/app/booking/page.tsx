@@ -37,9 +37,13 @@ function BookingContent() {
   const searchOffer = useSearchStore((s) => s.selectedOffer);
 
   useEffect(() => {
-    if (!offer) {
-      const sourceOffer = legacyOffer || searchOffer;
-      if (sourceOffer) {
+    const sourceOffer = legacyOffer || searchOffer;
+    if (sourceOffer) {
+      // Always update if the source offer differs from current (new search = new offer)
+      const isSameOffer = offer?.id === sourceOffer.id
+        && offer?.itineraries?.[0]?.segments?.[0]?.number === sourceOffer.itineraries?.[0]?.segments?.[0]?.number
+        && offer?.price?.total === sourceOffer.price?.total;
+      if (!offer || !isSameOffer) {
         setOffer(sourceOffer);
       }
     }

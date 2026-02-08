@@ -12,12 +12,17 @@ import type { FlightOffer } from '@/types/seatmap';
  * cache TTL.
  */
 export function useSeatmap(offer: FlightOffer | null) {
+  // Build a unique cache key from offer content, not just ID (Amadeus reuses "1", "2" etc.)
+  const cacheKey = offer
+    ? `${offer.id}-${offer.itineraries?.[0]?.segments?.[0]?.carrierCode ?? ''}-${offer.itineraries?.[0]?.segments?.[0]?.number ?? ''}-${offer.price?.total ?? ''}`
+    : null;
+
   return useQuery({
-    queryKey: ['seatmap', offer?.id ?? null],
+    queryKey: ['seatmap', cacheKey],
     queryFn: () => getSeatmaps(offer ? [offer] : []),
     enabled: !!offer,
-    staleTime: 5 * 60 * 1000, // 5 min — matches backend cache TTL
-    gcTime: 10 * 60 * 1000, // 10 min garbage collection
+    staleTime: 2 * 60 * 1000, // 2 min — shorter to avoid stale data
+    gcTime: 5 * 60 * 1000,
     retry: 1,
   });
 }

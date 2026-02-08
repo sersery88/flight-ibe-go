@@ -29,5 +29,11 @@ export type { ExitRowDialogProps } from './exit-row-dialog';
 
 export { NoSeatmapFallback } from './no-seatmap-fallback';
 
+export { CabinAmenityBar } from './cabin-amenity-bar';
+export type { CabinAmenityBarProps } from './cabin-amenity-bar';
+
+export { AvailableSeatsCounter } from './available-seats-counter';
+export type { AvailableSeatsCounterProps } from './available-seats-counter';
+
 export { SeatmapModal } from './seatmap-modal';
 export type { SeatmapModalProps } from './seatmap-modal';
