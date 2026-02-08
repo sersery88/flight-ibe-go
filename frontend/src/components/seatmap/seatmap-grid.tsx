@@ -246,30 +246,41 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             );
           })}
 
-          {/* Row numbers (LEFT) + EXIT labels (both sides) */}
+          {/* Row numbers (LEFT) */}
+          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => (
+            <div
+              key={`row-${rowNum}`}
+              className="text-xs font-medium text-muted-foreground flex items-center justify-end pr-1 w-full"
+              style={{ gridRow, gridColumn: 1 }}
+              role="rowheader"
+            >
+              {xToRowLabel.get(rowNum) ?? rowNum}
+            </div>
+          ))}
+
+          {/* Exit row indicators — pulsing dots on both outer edges */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            const isExit = exitRows.has(rowNum);
-            const label = xToRowLabel.get(rowNum) ?? rowNum;
+            if (!exitRows.has(rowNum)) return null;
             return (
-              <React.Fragment key={`row-${rowNum}`}>
-                {/* Left: row number, stacked with EXIT below for exit rows */}
+              <React.Fragment key={`exit-${rowNum}`}>
                 <div
-                  className="flex flex-col items-end justify-center pr-1 w-full"
-                  style={{ gridRow, gridColumn: 1 }}
-                  role="rowheader"
+                  className="flex items-center justify-end pr-0.5"
+                  style={{ gridRow, gridColumn: 2 }}
                 >
-                  <span className="text-xs font-medium text-muted-foreground leading-tight">{label}</span>
-                  {isExit && <span className="text-[7px] font-black tracking-wide text-red-500 dark:text-red-400 leading-tight">EXIT</span>}
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-50" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                  </span>
                 </div>
-                {/* Right: EXIT label for exit rows */}
-                {isExit && (
-                  <div
-                    className="flex flex-col items-start justify-center pl-1 w-full"
-                    style={{ gridRow, gridColumn: rightLabelCol }}
-                  >
-                    <span className="text-[7px] font-black tracking-wide text-red-500 dark:text-red-400 leading-tight">EXIT</span>
-                  </div>
-                )}
+                <div
+                  className="flex items-center justify-start pl-0.5"
+                  style={{ gridRow, gridColumn: rightLabelCol - 1 }}
+                >
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-50" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                  </span>
+                </div>
               </React.Fragment>
             );
           })}
