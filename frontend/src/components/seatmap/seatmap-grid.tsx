@@ -274,17 +274,18 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                   )}
                   <span className="text-xs font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
                 </div>
-                {/* Right side: exit badge */}
-                {isExit && (
-                  <div
-                    className="flex items-center justify-start pl-1"
-                    style={{ gridRow, gridColumn: rightLabelCol }}
-                  >
-                    <span className="inline-flex items-center rounded bg-emerald-600 px-0.5 py-px shadow-sm shadow-emerald-500/30 animate-pulse">
+                {/* Right side: row number + exit badge */}
+                <div
+                  className="flex items-center justify-start gap-1 pl-1 w-full"
+                  style={{ gridRow, gridColumn: rightLabelCol }}
+                >
+                  <span className="text-xs font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
+                  {isExit && (
+                    <span className="inline-flex items-center rounded bg-emerald-600 px-0.5 py-px shadow-sm shadow-emerald-500/30 animate-pulse shrink-0">
                       <span className="text-[6px] font-black text-white tracking-wider leading-none">EXIT</span>
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
               </React.Fragment>
             );
           })}
