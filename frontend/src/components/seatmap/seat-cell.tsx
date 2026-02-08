@@ -29,6 +29,8 @@ export interface SeatCellProps {
   passengerNumber?: number;
   price?: number;
   currency?: string;
+  /** Median price of all available seats — used to detect preferred tier */
+  medianPrice?: number;
   onSelect: () => void;
   compact?: boolean;
   /** When true, seat is visually dimmed (filter active, not matching) */
@@ -45,6 +47,7 @@ export const SeatCell = React.memo(function SeatCell({
   passengerNumber,
   price,
   currency,
+  medianPrice,
   onSelect,
   compact = false,
   dimmed = false,
@@ -52,11 +55,14 @@ export const SeatCell = React.memo(function SeatCell({
 }: SeatCellProps) {
   const disabled = status === 'BLOCKED' || status === 'OCCUPIED';
 
-  // Determine category and style
-  const category = useMemo(
-    () => getSeatCategory(seat.characteristicsCodes),
-    [seat.characteristicsCodes]
-  );
+  // Determine category — standard seats above median price → preferred
+  const category = useMemo(() => {
+    const base = getSeatCategory(seat.characteristicsCodes);
+    if (base === 'standard' && price != null && price > 0 && medianPrice != null && medianPrice > 0 && price > medianPrice * 1.2) {
+      return 'preferred' as const;
+    }
+    return base;
+  }, [seat.characteristicsCodes, price, medianPrice]);
   const categoryStyle = CATEGORY_STYLES[category];
 
   // Color logic:

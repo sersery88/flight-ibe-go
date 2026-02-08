@@ -159,6 +159,22 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
 
   const rightLabelCol = totalCols;
 
+  // Calculate median price of available seats for preferred tier detection
+  const medianPrice = useMemo(() => {
+    const prices: number[] = [];
+    for (const seat of deck.seats) {
+      if (!seat.travelerPricing) continue;
+      for (const tp of seat.travelerPricing) {
+        if (tp.seatAvailabilityStatus !== 'AVAILABLE') continue;
+        const p = parseFloat(tp.price?.total ?? tp.price?.base ?? '0');
+        if (p > 0) prices.push(p);
+      }
+    }
+    if (prices.length === 0) return 0;
+    prices.sort((a, b) => a - b);
+    return prices[Math.floor(prices.length / 2)];
+  }, [deck.seats]);
+
   // Handle seat interaction (mobile vs desktop)
   const handleSeatInteraction = useCallback(
     (seat: Seat) => {
@@ -315,6 +331,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                     passengerNumber={passengerNumber}
                     price={price}
                     currency={currency}
+                    medianPrice={medianPrice}
                     onSelect={() => handleSeatInteraction(seat)}
                     compact={compact}
                     dimmed={dimmed}
