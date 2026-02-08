@@ -1,12 +1,10 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback, useEffect, useState } from 'react';
 import type {
   Deck,
   Seat,
   SelectedSeat,
-  PriceTier,
-  PriceTierDefinition,
   AircraftCabinAmenities,
 } from '@/types/seatmap';
 import {
@@ -18,6 +16,8 @@ import {
 } from '@/lib/seat-grid-builder';
 import { getFacilityType } from '@/lib/seat-characteristics';
 import { PASSENGER_COLORS } from '@/types/seatmap';
+import { getSeatCategory } from '@/lib/seat-categories';
+import type { SeatCategory } from '@/lib/seat-categories';
 import { SeatCell } from './seat-cell';
 import { SeatTooltip } from './seat-tooltip';
 import { CabinHeader } from './cabin-header';
@@ -31,12 +31,11 @@ export interface SeatmapGridProps {
   selectedSeats: Record<string, SelectedSeat>;
   activeTravelerId: string;
   onSeatSelect: (seat: Seat) => void;
-  priceTiers?: PriceTierDefinition[];
-  /** Map travelerId → index (0-based) for colors */
   travelerIndexMap?: Record<string, number>;
-  /** Cabin amenities from the seatmap level */
   amenities?: AircraftCabinAmenities;
   compact?: boolean;
+  activeFilter?: SeatCategory | null;
+  onSeatTapMobile?: (seat: Seat) => void;
 }
 
 // ============================================================================
@@ -45,14 +44,12 @@ export interface SeatmapGridProps {
 
 function buildColumnMap(columns: number[], aisles: number[]): Map<number, number> {
   const map = new Map<number, number>();
-  // Column 1 is reserved for row numbers
   let gridCol = 2;
   for (let i = 0; i < columns.length; i++) {
     map.set(columns[i], gridCol);
     gridCol++;
-    // Add aisle gap column after this column if it's an aisle boundary
     if (aisles.includes(columns[i])) {
-      gridCol++; // skip one column for aisle
+      gridCol++;
     }
   }
   return map;
@@ -61,7 +58,6 @@ function buildColumnMap(columns: number[], aisles: number[]): Map<number, number
 function buildRowMap(rowRange: [number, number], rowGaps: number[]): Map<number, number> {
   const map = new Map<number, number>();
   const gapSet = new Set(rowGaps);
-  // Row 1 is reserved for column labels header
   let gridRow = 2;
   for (let r = rowRange[0]; r <= rowRange[1]; r++) {
     if (gapSet.has(r)) continue;
@@ -72,8 +68,24 @@ function buildRowMap(rowRange: [number, number], rowGaps: number[]): Map<number,
 }
 
 function totalGridColumns(columns: number[], aisles: number[]): number {
-  // 1 (row-number col) + columns.length + aisles.length (gap cols) + 1 (right label col)
   return 1 + columns.length + aisles.length + 1;
+}
+
+// ============================================================================
+// Hook: detect mobile
+// ============================================================================
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  return isMobile;
 }
 
 // ============================================================================
@@ -88,20 +100,21 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
   travelerIndexMap,
   amenities,
   compact = false,
+  activeFilter,
+  onSeatTapMobile,
 }: SeatmapGridProps) {
+  const isMobile = useIsMobile();
   const layout = useMemo(() => buildGridLayout(deck), [deck]);
   const { columns, aisles, rowRange, rowGaps, cabinBoundaries } = layout;
 
   const columnMap = useMemo(() => buildColumnMap(columns, aisles), [columns, aisles]);
   const rowMap = useMemo(() => buildRowMap(rowRange, rowGaps), [rowRange, rowGaps]);
 
-  // Set of selected seat numbers for quick lookup
   const selectedNumbers = useMemo(
     () => new Set(Object.values(selectedSeats).map((s) => s.number)),
     [selectedSeats]
   );
 
-  // Reverse map: seatNumber → travelerId
   const seatToTraveler = useMemo(() => {
     const m = new Map<string, string>();
     for (const [tid, sel] of Object.entries(selectedSeats)) {
@@ -112,13 +125,11 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
 
   const totalCols = totalGridColumns(columns, aisles);
 
-  // Wing rows
   const config = deck.deckConfiguration;
   const wingStart = config?.startWingsRow ?? 0;
   const wingEnd = config?.endWingsRow ?? 0;
   const exitRows = useMemo(() => new Set(config?.exitRowsX ?? []), [config?.exitRowsX]);
 
-  // Build aisle column indices for gap rendering
   const aisleGridCols = useMemo(() => {
     const cols: number[] = [];
     let gridCol = 2;
@@ -132,8 +143,19 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
     return cols;
   }, [columns, aisles]);
 
-  // Last grid column index for right-side labels
   const rightLabelCol = totalCols;
+
+  // Handle seat interaction (mobile vs desktop)
+  const handleSeatInteraction = useCallback(
+    (seat: Seat) => {
+      if (isMobile && onSeatTapMobile) {
+        onSeatTapMobile(seat);
+      } else {
+        onSeatSelect(seat);
+      }
+    },
+    [isMobile, onSeatTapMobile, onSeatSelect]
+  );
 
   return (
     <div className="space-y-3">
@@ -157,9 +179,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
           }}
         >
           {/* Row 1: Column labels */}
-          <div className="text-xs font-medium text-muted-foreground" style={{ gridRow: 1, gridColumn: 1 }}>
-            {/* empty corner */}
-          </div>
+          <div className="text-xs font-medium text-muted-foreground" style={{ gridRow: 1, gridColumn: 1 }} />
           {columns.map((y, i) => {
             const gc = columnMap.get(y);
             if (gc == null) return null;
@@ -186,7 +206,6 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
           {/* Row numbers + Wing/Exit indicators (LEFT side) */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
             const isWing = rowNum >= wingStart && rowNum <= wingEnd;
-            const isExit = exitRows.has(rowNum);
 
             return (
               <div
@@ -229,13 +248,11 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             const isWing = rowNum >= wingStart && rowNum <= wingEnd;
             if (!isWing) return null;
 
-            // Check boundaries: first and last wing row get special treatment
             const isFirst = rowNum === wingStart;
             const isLast = rowNum === wingEnd;
 
             return (
               <React.Fragment key={`wing-bg-${rowNum}`}>
-                {/* Full-width wing background spanning all seat columns */}
                 <div
                   className={[
                     'absolute inset-x-0 bg-blue-50/40 dark:bg-blue-950/15 pointer-events-none',
@@ -283,11 +300,9 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             const currency = getSeatCurrency(seat, activeTravelerId);
             const isSelected = selectedNumbers.has(seat.number);
 
-            // Wing & exit info from deck config
             const isWingZone = x >= wingStart && x <= wingEnd && wingStart > 0;
             const isExitRowConfig = exitRows.has(x);
 
-            // Passenger color & number
             const assignedTraveler = seatToTraveler.get(seat.number);
             const travelerIdx = assignedTraveler && travelerIndexMap
               ? travelerIndexMap[assignedTraveler]
@@ -296,6 +311,13 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
               ? PASSENGER_COLORS[travelerIdx % PASSENGER_COLORS.length]
               : undefined;
             const passengerNumber = travelerIdx != null ? travelerIdx + 1 : undefined;
+
+            // Filter logic
+            const seatCategory = getSeatCategory(seat.characteristicsCodes);
+            const isFilterActive = activeFilter != null;
+            const matchesFilter = seatCategory === activeFilter;
+            const dimmed = isFilterActive && !matchesFilter && !isSelected;
+            const highlighted = isFilterActive && matchesFilter && status === 'AVAILABLE' && !isSelected;
 
             return (
               <div
@@ -310,7 +332,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                   currency={currency}
                   isWingZone={isWingZone}
                   isExitRowConfig={isExitRowConfig}
-                  onSelect={() => onSeatSelect(seat)}
+                  onSelect={() => handleSeatInteraction(seat)}
                 >
                   <SeatCell
                     seat={seat}
@@ -320,8 +342,10 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                     passengerNumber={passengerNumber}
                     price={price}
                     currency={currency}
-                    onSelect={() => onSeatSelect(seat)}
+                    onSelect={() => handleSeatInteraction(seat)}
                     compact={compact}
+                    dimmed={dimmed}
+                    highlighted={highlighted}
                   />
                 </SeatTooltip>
               </div>
@@ -343,7 +367,10 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             return (
               <div
                 key={`facility-${idx}`}
-                className="relative z-[1] flex items-center justify-center text-sm opacity-50"
+                className={[
+                  'relative z-[1] flex items-center justify-center text-sm',
+                  activeFilter ? 'opacity-20' : 'opacity-50',
+                ].join(' ')}
                 style={{ gridRow, gridColumn: gridCol }}
                 title={facilityDef?.label ?? facility.code ?? ''}
               >
@@ -352,7 +379,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             );
           })}
 
-          {/* Aisle gap columns — render subtle dividers */}
+          {/* Aisle gap columns */}
           {aisleGridCols.map((gc) =>
             Array.from(rowMap.values()).map((gr) => (
               <div

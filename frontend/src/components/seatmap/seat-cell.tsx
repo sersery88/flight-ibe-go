@@ -1,42 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { Seat, SeatStatus, PriceTier } from '@/types/seatmap';
+import type { Seat, SeatStatus } from '@/types/seatmap';
 import { getSeatCharacteristic } from '@/lib/seat-characteristics';
-
-// ============================================================================
-// Color Mapping
-// ============================================================================
-
-const STATUS_COLORS: Record<string, { bg: string; text: string; ring: string }> = {
-  'AVAILABLE_free':    { bg: 'bg-emerald-500',  text: 'text-white', ring: 'ring-emerald-400' },
-  'AVAILABLE_low':     { bg: 'bg-blue-500',     text: 'text-white', ring: 'ring-blue-400' },
-  'AVAILABLE_mid':     { bg: 'bg-amber-500',    text: 'text-white', ring: 'ring-amber-400' },
-  'AVAILABLE_high':    { bg: 'bg-violet-500',   text: 'text-white', ring: 'ring-violet-400' },
-  'BLOCKED':           { bg: 'bg-gray-300',     text: 'text-gray-500', ring: 'ring-gray-200' },
-  'OCCUPIED':          { bg: 'bg-gray-400',     text: 'text-gray-600', ring: 'ring-gray-300' },
-  'SELECTED':          { bg: 'bg-pink-500',     text: 'text-white', ring: 'ring-pink-400' },
-};
-
-function getPriceTier(price: number | undefined): PriceTier {
-  if (price == null || price === 0) return 'free';
-  if (price < 30) return 'low';
-  if (price <= 80) return 'mid';
-  return 'high';
-}
-
-function getColorKey(status: SeatStatus, price?: number, characteristics?: string[]): string {
-  if (status === 'BLOCKED') return 'BLOCKED';
-  if (status === 'OCCUPIED') return 'OCCUPIED';
-  if (status === 'SELECTED') return 'SELECTED';
-
-  // Check for extra legroom / premium characteristics
-  const isPremium = characteristics?.some(c => c === 'L' || c === 'XL' || c === 'PS' || c === '1A' || c === 'P');
-  if (isPremium && (price ?? 0) > 0) return 'AVAILABLE_high';
-
-  const tier = getPriceTier(price);
-  return `AVAILABLE_${tier}`;
-}
+import { getSeatCategory, CATEGORY_STYLES } from '@/lib/seat-categories';
 
 // ============================================================================
 // Position helper
@@ -64,6 +31,10 @@ export interface SeatCellProps {
   currency?: string;
   onSelect: () => void;
   compact?: boolean;
+  /** When true, seat is visually dimmed (filter active, not matching) */
+  dimmed?: boolean;
+  /** When true, seat is highlighted (filter active + matching) */
+  highlighted?: boolean;
 }
 
 export const SeatCell = React.memo(function SeatCell({
@@ -76,11 +47,39 @@ export const SeatCell = React.memo(function SeatCell({
   currency,
   onSelect,
   compact = false,
+  dimmed = false,
+  highlighted = false,
 }: SeatCellProps) {
   const disabled = status === 'BLOCKED' || status === 'OCCUPIED';
 
-  const colorKey = getColorKey(status, price, seat.characteristicsCodes);
-  const colors = STATUS_COLORS[colorKey] ?? STATUS_COLORS['BLOCKED'];
+  // Determine category and style
+  const category = useMemo(
+    () => getSeatCategory(seat.characteristicsCodes),
+    [seat.characteristicsCodes]
+  );
+  const categoryStyle = CATEGORY_STYLES[category];
+
+  // Color logic:
+  // 1. SELECTED → passengerColor (handled via style prop) or pink
+  // 2. BLOCKED → gray
+  // 3. OCCUPIED → dark gray with ✗
+  // 4. AVAILABLE → category color, OR emerald if free + standard
+  const colors = useMemo(() => {
+    if (isSelected) {
+      return { bg: 'bg-pink-500', text: 'text-white', ring: 'ring-pink-400' };
+    }
+    if (status === 'BLOCKED') {
+      return { bg: 'bg-gray-300 dark:bg-gray-700', text: 'text-gray-500 dark:text-gray-400', ring: 'ring-gray-200' };
+    }
+    if (status === 'OCCUPIED') {
+      return { bg: 'bg-gray-400 dark:bg-gray-600', text: 'text-gray-600 dark:text-gray-300', ring: 'ring-gray-300' };
+    }
+    // AVAILABLE: free standard → emerald, else category color
+    if (category === 'standard' && (price == null || price === 0)) {
+      return { bg: 'bg-emerald-500', text: 'text-white', ring: 'ring-emerald-400' };
+    }
+    return { bg: categoryStyle.bg, text: categoryStyle.text, ring: categoryStyle.ring };
+  }, [isSelected, status, category, price, categoryStyle]);
 
   const ariaLabel = useMemo(() => {
     const parts: string[] = [`Sitz ${seat.number}`];
@@ -98,7 +97,12 @@ export const SeatCell = React.memo(function SeatCell({
       parts.push('Kostenlos');
     }
 
-    // Add notable characteristics
+    // Category info
+    if (category !== 'standard') {
+      parts.push(categoryStyle.label);
+    }
+
+    // Warning characteristics
     if (seat.characteristicsCodes) {
       for (const code of seat.characteristicsCodes) {
         const def = getSeatCharacteristic(code);
@@ -107,14 +111,16 @@ export const SeatCell = React.memo(function SeatCell({
     }
 
     return parts.join(', ');
-  }, [seat.number, seat.characteristicsCodes, status, price, currency]);
+  }, [seat.number, seat.characteristicsCodes, status, price, currency, category, categoryStyle.label]);
 
-  const size = compact ? 'min-w-[36px] min-h-[36px] w-9 h-9 text-[10px]' : 'min-w-[40px] min-h-[40px] w-10 h-10 text-xs';
+  const size = compact
+    ? 'min-w-[36px] min-h-[36px] w-9 h-9 text-[10px]'
+    : 'min-w-[40px] min-h-[40px] w-10 h-10 text-xs';
 
   return (
     <button
       type="button"
-      disabled={disabled}
+      disabled={disabled || dimmed}
       onClick={onSelect}
       aria-label={ariaLabel}
       aria-pressed={isSelected}
@@ -125,16 +131,30 @@ export const SeatCell = React.memo(function SeatCell({
         colors.bg,
         colors.text,
         `focus-visible:${colors.ring}`,
-        disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:scale-105 active:scale-95',
-        isSelected && passengerColor ? '' : '',
-      ].join(' ')}
+        disabled
+          ? 'cursor-not-allowed opacity-70'
+          : 'cursor-pointer hover:scale-105 active:scale-95',
+        // Dimming for filter
+        dimmed ? 'opacity-20 !pointer-events-none' : '',
+        // Highlight for filter match
+        highlighted ? 'ring-2 ring-white shadow-lg' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={
         isSelected && passengerColor
           ? { backgroundColor: passengerColor }
           : undefined
       }
     >
-      {/* Seat number */}
+      {/* Mini category icon */}
+      {categoryStyle.icon && status === 'AVAILABLE' && !isSelected && !dimmed && (
+        <span className="absolute -top-1 -right-1 text-[8px] md:text-[8px] leading-none pointer-events-none bg-white rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-sm">
+          {categoryStyle.icon}
+        </span>
+      )}
+
+      {/* Seat content */}
       {status === 'OCCUPIED' ? (
         <span className="text-xs font-bold">✗</span>
       ) : isSelected ? (

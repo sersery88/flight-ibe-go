@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { ChevronRight } from 'lucide-react';
 import type { AircraftCabinAmenities } from '@/types/seatmap';
 
 // ============================================================================
@@ -11,7 +12,6 @@ import type { AircraftCabinAmenities } from '@/types/seatmap';
 interface AmenityPill {
   icon: string;
   label: string;
-  /** 'included' = green, 'paid' = gray, 'info' = default */
   variant: 'included' | 'paid' | 'info';
 }
 
@@ -47,7 +47,6 @@ function buildAmenityPills(amenities: AircraftCabinAmenities): AmenityPill[] {
     const p = amenities.power;
     let label = 'Strom';
 
-    // Check USB type first for more specific label
     if (p.usbType) {
       const usbMap: Record<string, string> = {
         USB_A: 'USB-A',
@@ -213,9 +212,10 @@ function SeatMediaOverlay({
 
 export interface CabinAmenityBarProps {
   amenities?: AircraftCabinAmenities;
+  cabinLabel?: string;
 }
 
-export function CabinAmenityBar({ amenities }: CabinAmenityBarProps) {
+export function CabinAmenityBar({ amenities, cabinLabel }: CabinAmenityBarProps) {
   const [mediaOverlay, setMediaOverlay] = useState<{ title?: string; href: string } | null>(null);
 
   const handleMediaClick = useCallback((href: string, title?: string) => {
@@ -225,40 +225,53 @@ export function CabinAmenityBar({ amenities }: CabinAmenityBarProps) {
   if (!amenities) return null;
 
   const pills = buildAmenityPills(amenities);
-  if (pills.length === 0) return null;
+  if (pills.length === 0 && !amenities.seat?.medias?.[0]?.href) return null;
 
-  // Check for seat media
   const seatMedias = amenities.seat?.medias;
   const hasMedia = seatMedias && seatMedias.length > 0 && seatMedias[0].href;
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-        {pills.map((pill, i) => (
-          <span
-            key={i}
-            className={[
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-              VARIANT_STYLES[pill.variant],
-            ].join(' ')}
-          >
-            <span className="text-xs">{pill.icon}</span>
-            <span>{pill.label}</span>
-          </span>
-        ))}
+      {pills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          {pills.map((pill, i) => (
+            <span
+              key={i}
+              className={[
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                VARIANT_STYLES[pill.variant],
+              ].join(' ')}
+            >
+              <span className="text-xs">{pill.icon}</span>
+              <span>{pill.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
-        {/* Seat Media Button */}
-        {hasMedia && (
-          <button
-            type="button"
-            onClick={() => handleMediaClick(seatMedias![0].href!, seatMedias![0].title)}
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-950/50 transition-colors cursor-pointer"
-          >
-            <span className="text-xs">📷</span>
-            <span>Sitz ansehen</span>
-          </button>
-        )}
-      </div>
+      {/* Seat Media Card — prominent */}
+      {hasMedia && (
+        <button
+          type="button"
+          onClick={() => handleMediaClick(seatMedias![0].href!, seatMedias![0].title)}
+          className="mt-2 w-full text-left group"
+        >
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors">
+            <div className="w-12 h-12 rounded-lg bg-violet-100 dark:bg-violet-800 flex items-center justify-center text-2xl shrink-0">
+              📷
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-violet-900 dark:text-violet-100">
+                Sitzplatz-Foto ansehen
+              </p>
+              <p className="text-xs text-violet-600 dark:text-violet-400">
+                Dein Sitz{cabinLabel ? ` in der ${cabinLabel}` : ''}
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-violet-400 ml-auto shrink-0 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </button>
+      )}
 
       {/* Media Overlay */}
       <AnimatePresence>

@@ -3,11 +3,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-} from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import {
   SeatmapGrid,
@@ -20,6 +15,7 @@ import {
   NoSeatmapFallback,
   AvailableSeatsCounter,
 } from '@/components/seatmap';
+import { SeatDetailSheet } from '@/components/seatmap/seat-detail-sheet';
 import type { TravelerInfo } from '@/components/seatmap/passenger-selector';
 import { useSeatmap } from '@/hooks/use-seatmap';
 import { useSeatSelectionStore } from '@/stores/seat-selection-store';
@@ -32,7 +28,9 @@ import type {
 } from '@/types/seatmap';
 import { getAircraftProfile } from '@/lib/aircraft-profiles';
 import { getSeatCharacteristic } from '@/lib/seat-characteristics';
-import { getSeatPrice, getSeatCurrency } from '@/lib/seat-grid-builder';
+import { getSeatPrice, getSeatCurrency, getSeatStatus } from '@/lib/seat-grid-builder';
+import { getAvailableCategories } from '@/lib/seat-categories';
+import type { SeatCategory } from '@/lib/seat-categories';
 
 // ============================================================================
 // Types
@@ -71,7 +69,6 @@ function isExitRowSeat(seat: Seat): boolean {
 function SeatmapSkeleton() {
   return (
     <div className="flex flex-col items-center gap-3 py-8 animate-pulse">
-      {/* Fuselage outline */}
       <div className="w-48 h-6 bg-muted rounded-full" />
       {Array.from({ length: 12 }).map((_, i) => (
         <div key={i} className="flex items-center gap-1.5">
@@ -152,6 +149,10 @@ export function SeatmapModal({
   const [pendingExitSeat, setPendingExitSeat] = useState<Seat | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
 
+  // --- New states for v3 ---
+  const [activeFilter, setActiveFilter] = useState<SeatCategory | null>(null);
+  const [detailSeat, setDetailSeat] = useState<Seat | null>(null);
+
   // Reset active segment when prop changes
   useEffect(() => {
     setActiveSegmentIdx(segmentIndex);
@@ -165,10 +166,18 @@ export function SeatmapModal({
     }
   }, [travelers, activeTravelerId]);
 
-  // Reset deck when segment changes
+  // Reset deck + filter + detail when segment changes
   useEffect(() => {
     setActiveDeck('MAIN');
+    setActiveFilter(null);
+    setDetailSeat(null);
   }, [activeSegmentIdx]);
+
+  // Reset filter + detail when deck changes
+  useEffect(() => {
+    setActiveFilter(null);
+    setDetailSeat(null);
+  }, [activeDeck]);
 
   // ---------- Derived ----------
   const activeSegment = seatmapSegments[activeSegmentIdx] ?? null;
@@ -179,10 +188,8 @@ export function SeatmapModal({
   const aircraftCode = activeSegment?.aircraft?.code;
   const aircraftProfile = getAircraftProfile(aircraftCode);
 
-  // Selections for current segment
   const segmentSelections = selections[segmentId] ?? {};
 
-  // Traveler index map (for colors)
   const travelerIndexMap = useMemo(() => {
     const map: Record<string, number> = {};
     let idx = 0;
@@ -194,35 +201,75 @@ export function SeatmapModal({
     return map;
   }, [travelers]);
 
-  // Eligible travelers (no infants)
   const eligibleTravelers = useMemo(
     () => travelers.filter(t => t.type !== 'HELD_INFANT'),
     [travelers]
   );
 
-  // Total cost across all segments
+  // Available categories for legend
+  const availableCategories = useMemo(
+    () => (currentDeck ? getAvailableCategories(currentDeck.seats) : []),
+    [currentDeck]
+  );
+
   const totalCost = useSeatSelectionStore(s => s.totalSeatCost());
   const currency = useSeatSelectionStore(s => s.currency()) || 'EUR';
+
+  // ---------- Selected seat numbers for detail sheet status ----------
+  const selectedNumbers = useMemo(
+    () => new Set(Object.values(segmentSelections).map((s) => s.number)),
+    [segmentSelections]
+  );
+
+  // Compute detail seat status/price for mobile sheet
+  const detailSeatStatus = useMemo(() => {
+    if (!detailSeat) return undefined;
+    return getSeatStatus(detailSeat, activeTravelerId, selectedNumbers);
+  }, [detailSeat, activeTravelerId, selectedNumbers]);
+
+  const detailSeatPrice = useMemo(() => {
+    if (!detailSeat) return undefined;
+    return getSeatPrice(detailSeat, activeTravelerId) ?? undefined;
+  }, [detailSeat, activeTravelerId]);
+
+  const detailSeatCurrency = useMemo(() => {
+    if (!detailSeat) return undefined;
+    return getSeatCurrency(detailSeat, activeTravelerId);
+  }, [detailSeat, activeTravelerId]);
+
+  // Wing/exit info for detail seat
+  const detailSeatWingZone = useMemo(() => {
+    if (!detailSeat || !currentDeck) return false;
+    const config = currentDeck.deckConfiguration;
+    const x = detailSeat.coordinates?.x ?? 0;
+    const ws = config?.startWingsRow ?? 0;
+    const we = config?.endWingsRow ?? 0;
+    return x >= ws && x <= we && ws > 0;
+  }, [detailSeat, currentDeck]);
+
+  const detailSeatExitRow = useMemo(() => {
+    if (!detailSeat || !currentDeck) return false;
+    const x = detailSeat.coordinates?.x ?? 0;
+    const exitRowsX = currentDeck.deckConfiguration?.exitRowsX ?? [];
+    return exitRowsX.includes(x);
+  }, [detailSeat, currentDeck]);
 
   // ---------- Handlers ----------
   const handleSeatSelect = useCallback(
     (seat: Seat) => {
-      // Check if seat is available
       const pricing = seat.travelerPricing?.find(
         tp => tp.seatAvailabilityStatus === 'AVAILABLE'
       );
       if (!pricing && seat.travelerPricing && seat.travelerPricing.length > 0) {
-        return; // Seat not available
+        return;
       }
 
-      // Check if this seat is already selected by the active traveler
       const existingSelection = segmentSelections[activeTravelerId];
       if (existingSelection?.number === seat.number) {
         storeRemoveSeat(segmentId, activeTravelerId);
         return;
       }
 
-      // Check if another traveler has this seat — deselect them
       for (const [tid, sel] of Object.entries(segmentSelections)) {
         if (sel.number === seat.number) {
           storeRemoveSeat(segmentId, tid);
@@ -230,12 +277,10 @@ export function SeatmapModal({
         }
       }
 
-      // Exit row warning
       if (isExitRowSeat(seat)) {
-        // Children cannot sit in exit row
         const traveler = travelers.find(t => t.id === activeTravelerId);
         if (traveler?.type === 'CHILD') {
-          return; // Block children from exit rows
+          return;
         }
         setPendingExitSeat(seat);
         setExitRowDialogOpen(true);
@@ -263,7 +308,6 @@ export function SeatmapModal({
 
       storeSelectSeat(segmentId, activeTravelerId, selected);
 
-      // Auto-advance to next traveler without a seat
       const eligible = travelers.filter(t => t.type !== 'HELD_INFANT');
       const currentIdx = eligible.findIndex(t => t.id === activeTravelerId);
       const updatedSelections = {
@@ -312,6 +356,17 @@ export function SeatmapModal({
     if (idx >= 0) setActiveSegmentIdx(idx);
   }, [seatmapSegments]);
 
+  // Mobile tap handler
+  const handleSeatTapMobile = useCallback((seat: Seat) => {
+    setDetailSeat(seat);
+  }, []);
+
+  // Handle selection from detail sheet
+  const handleDetailSheetSelect = useCallback((seat: Seat) => {
+    handleSeatSelect(seat);
+    setDetailSeat(null);
+  }, [handleSeatSelect]);
+
   // ---------- Render ----------
   return (
     <>
@@ -326,12 +381,9 @@ export function SeatmapModal({
           <DialogPrimitive.Popup
             className={[
               'fixed z-50 flex flex-col bg-background',
-              // Mobile: full-screen slide-up
               'inset-0',
-              // Desktop: centered modal
               'md:inset-auto md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]',
               'md:w-full md:max-w-5xl md:max-h-[85vh] md:rounded-2xl md:border md:border-border md:shadow-2xl',
-              // Animations
               'data-[open]:animate-in data-[closed]:animate-out',
               'data-[open]:slide-in-from-bottom data-[closed]:slide-out-to-bottom',
               'md:data-[open]:slide-in-from-bottom-0 md:data-[closed]:slide-out-to-bottom-0',
@@ -430,6 +482,8 @@ export function SeatmapModal({
                   onSeatSelect={handleSeatSelect}
                   travelerIndexMap={travelerIndexMap}
                   amenities={activeSegment?.aircraftCabinAmenities}
+                  activeFilter={activeFilter}
+                  onSeatTapMobile={handleSeatTapMobile}
                 />
               )}
             </div>
@@ -444,7 +498,14 @@ export function SeatmapModal({
                     onClick={() => setLegendOpen(!legendOpen)}
                     className="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
                   >
-                    <span>Legende</span>
+                    <span>
+                      Legende
+                      {activeFilter && (
+                        <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
+                          Filter aktiv
+                        </span>
+                      )}
+                    </span>
                     {legendOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                   </button>
                   <AnimatePresence>
@@ -456,21 +517,28 @@ export function SeatmapModal({
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden px-4 pb-3"
                       >
-                        <Legend />
+                        <Legend
+                          availableCategories={availableCategories}
+                          activeFilter={activeFilter}
+                          onFilterChange={setActiveFilter}
+                        />
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
                 {/* Desktop: always visible */}
                 <div className="hidden md:block px-6 py-3">
-                  <Legend />
+                  <Legend
+                    availableCategories={availableCategories}
+                    activeFilter={activeFilter}
+                    onFilterChange={setActiveFilter}
+                  />
                 </div>
               </div>
             )}
 
             {/* ---- FOOTER (sticky) ---- */}
             <div className="sticky bottom-0 z-10 bg-background border-t border-border shrink-0">
-              {/* Compact selection summary */}
               {Object.keys(segmentSelections).length > 0 && (
                 <div className="px-4 pt-3 md:px-6">
                   <SelectionSummary
@@ -480,7 +548,6 @@ export function SeatmapModal({
                 </div>
               )}
 
-              {/* Action buttons */}
               <div className="flex items-center gap-3 px-4 py-3 md:px-6">
                 <button
                   type="button"
@@ -503,6 +570,18 @@ export function SeatmapModal({
           </DialogPrimitive.Popup>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
+
+      {/* Mobile Detail Bottom Sheet */}
+      <SeatDetailSheet
+        seat={detailSeat}
+        status={detailSeatStatus}
+        price={detailSeatPrice}
+        currency={detailSeatCurrency}
+        isWingZone={detailSeatWingZone}
+        isExitRowConfig={detailSeatExitRow}
+        onSelect={handleDetailSheetSelect}
+        onClose={() => setDetailSeat(null)}
+      />
 
       {/* Exit Row Warning */}
       <ExitRowDialog

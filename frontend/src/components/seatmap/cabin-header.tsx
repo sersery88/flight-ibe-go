@@ -24,7 +24,7 @@ export function CabinHeader({ cabin, amenities }: CabinHeaderProps) {
   return (
     <div className="px-1 py-2 border-b border-border">
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-      <CabinAmenityBar amenities={amenities} />
+      <CabinAmenityBar amenities={amenities} cabinLabel={label} />
     </div>
   );
 }

@@ -1,64 +1,82 @@
 'use client';
 
 import React from 'react';
+import type { SeatCategory } from '@/lib/seat-categories';
+import { CATEGORY_STYLES } from '@/lib/seat-categories';
 
 // ============================================================================
-// Legend items
+// Types
 // ============================================================================
 
-interface LegendItem {
+export interface LegendProps {
+  availableCategories: SeatCategory[];
+  activeFilter: SeatCategory | null;
+  onFilterChange: (filter: SeatCategory | null) => void;
+}
+
+// ============================================================================
+// Static legend items (always visible)
+// ============================================================================
+
+interface StaticLegendItem {
   color: string;
   label: string;
   pattern?: string;
-  /** Optional border/outline style instead of solid fill */
-  outline?: boolean;
-  /** Text color override for special items */
-  textColor?: string;
+  border?: boolean;
 }
 
-const LEGEND_ITEMS: LegendItem[] = [
-  // Price tiers
+const STATIC_ITEMS: StaticLegendItem[] = [
   { color: '#10B981', label: 'Kostenlos' },
-  { color: '#3B82F6', label: 'Günstig (< 30 €)' },
-  { color: '#F59E0B', label: 'Mittel (30–80 €)' },
-  { color: '#8B5CF6', label: 'Premium / Extra-Leg' },
-  // States
+  { color: '#38BDF8', label: 'Standard' },
   { color: '#EC4899', label: 'Ausgewählt', pattern: '✓' },
-  { color: '#D1D5DB', label: 'Blockiert' },
   { color: '#9CA3AF', label: 'Belegt', pattern: '✗' },
+  { color: '#D1D5DB', label: 'Blockiert' },
 ];
 
-interface SpecialLegendItem {
-  icon: string;
-  label: string;
-  colorClass: string;
-}
+// ============================================================================
+// Filter categories (excludes standard + restricted from clickable filters)
+// ============================================================================
 
-const SPECIAL_ITEMS: SpecialLegendItem[] = [
-  { icon: '🚪', label: 'Notausgangsreihe', colorClass: 'text-amber-600 dark:text-amber-400' },
-  { icon: '✈️', label: 'Flügelbereich', colorClass: 'text-blue-400 dark:text-blue-300' },
-  { icon: '🦵', label: 'Extra Beinfreiheit', colorClass: 'text-emerald-600 dark:text-emerald-400' },
-  { icon: '♿', label: 'Rollstuhlgerecht', colorClass: 'text-blue-600 dark:text-blue-400' },
+const FILTERABLE_CATEGORIES: SeatCategory[] = [
+  'exit',
+  'preferred',
+  'extraleg',
+  'bulkhead',
+  'bassinet',
+  'accessible',
+  'pet',
 ];
 
 // ============================================================================
 // Legend Component
 // ============================================================================
 
-export function Legend() {
+export function Legend({
+  availableCategories,
+  activeFilter,
+  onFilterChange,
+}: LegendProps) {
+  // Only show filterable categories that actually exist on this deck
+  const filterableOnDeck = FILTERABLE_CATEGORIES.filter(c =>
+    availableCategories.includes(c)
+  );
+
   return (
-    <div className="space-y-2">
-      {/* Color legend */}
+    <div className="space-y-2.5">
+      {/* Section 1: Static legend (prices + states) */}
       <div
-        className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs"
+        className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs"
         role="list"
         aria-label="Farblegende"
       >
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.label} className="flex items-center gap-2" role="listitem">
+        {STATIC_ITEMS.map((item) => (
+          <div key={item.label} className="flex items-center gap-1.5" role="listitem">
             <span
-              className="inline-flex items-center justify-center size-5 rounded-sm text-white text-[10px] font-bold shrink-0"
-              style={{ backgroundColor: item.color }}
+              className="inline-flex items-center justify-center size-4 rounded-sm text-white text-[9px] font-bold shrink-0"
+              style={{
+                backgroundColor: item.color,
+                ...(item.border ? { border: '1.5px solid #d1d5db' } : {}),
+              }}
             >
               {item.pattern ?? ''}
             </span>
@@ -67,21 +85,53 @@ export function Legend() {
         ))}
       </div>
 
-      {/* Special indicators */}
-      <div
-        className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs pt-1 border-t border-border/50"
-        role="list"
-        aria-label="Zusatzlegende"
-      >
-        {SPECIAL_ITEMS.map((item) => (
-          <div key={item.label} className="flex items-center gap-2" role="listitem">
-            <span className="inline-flex items-center justify-center size-5 text-sm shrink-0">
-              {item.icon}
-            </span>
-            <span className={item.colorClass}>{item.label}</span>
+      {/* Section 2: Seat type filter badges (clickable) */}
+      {filterableOnDeck.length > 0 && (
+        <div className="pt-1.5 border-t border-border/50">
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="list"
+            aria-label="Sitztyp-Filter"
+          >
+            {filterableOnDeck.map((cat) => {
+              const style = CATEGORY_STYLES[cat];
+              const isActive = activeFilter === cat;
+
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  role="listitem"
+                  onClick={() => onFilterChange(isActive ? null : cat)}
+                  aria-pressed={isActive}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-150',
+                    'border cursor-pointer hover:scale-105 active:scale-95',
+                    isActive
+                      ? 'bg-pink-500 text-white border-pink-400 shadow-md shadow-pink-500/20'
+                      : `${style.bg} ${style.text} border-transparent hover:ring-1 hover:ring-white/50`,
+                  ].join(' ')}
+                >
+                  {style.icon && <span className="text-xs">{style.icon}</span>}
+                  <span>{style.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Clear filter button when filter is active */}
+            {activeFilter && (
+              <button
+                type="button"
+                onClick={() => onFilterChange(null)}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border border-border text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <span>✕</span>
+                <span>Filter aufheben</span>
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

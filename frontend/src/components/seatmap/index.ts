@@ -20,6 +20,10 @@ export { PassengerSelector } from './passenger-selector';
 export type { PassengerSelectorProps, TravelerInfo } from './passenger-selector';
 
 export { Legend } from './legend';
+export type { LegendProps } from './legend';
+
+export { SeatDetailSheet } from './seat-detail-sheet';
+export type { SeatDetailSheetProps } from './seat-detail-sheet';
 
 export { SelectionSummary } from './selection-summary';
 export type { SelectionSummaryProps } from './selection-summary';

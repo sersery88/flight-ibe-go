@@ -62,7 +62,7 @@ export default function HomePage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative w-full overflow-hidden">
+      <section className="relative w-full overflow-visible">
         {/* Background — clean white/light gray */}
         <div className="absolute inset-0 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-background" />
 
