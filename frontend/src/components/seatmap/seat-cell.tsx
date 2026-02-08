@@ -147,9 +147,9 @@ export const SeatCell = React.memo(function SeatCell({
           : undefined
       }
     >
-      {/* Mini category icon */}
-      {categoryStyle.icon && status === 'AVAILABLE' && !isSelected && !dimmed && (
-        <span className="absolute -top-1 -right-1 text-[8px] md:text-[8px] leading-none pointer-events-none bg-white rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-sm">
+      {/* Mini category icon — only for special categories, not standard/restricted */}
+      {categoryStyle.icon && category !== 'standard' && category !== 'restricted' && status === 'AVAILABLE' && !isSelected && !dimmed && (
+        <span className="absolute -top-1 -right-1 text-[8px] leading-none pointer-events-none bg-white dark:bg-gray-900 rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-sm">
           {categoryStyle.icon}
         </span>
       )}
