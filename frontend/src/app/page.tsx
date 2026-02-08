@@ -1,21 +1,67 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Plane, MapPin, TrendingUp, Shield } from 'lucide-react';
 import { SearchForm } from '@/components/flight/search-form';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
-// Popular Destinations
+// Popular Routes (grouped by Swiss origin)
 // ============================================================================
 
-const POPULAR_DESTINATIONS = [
-  { city: 'Barcelona', code: 'BCN', country: 'Spanien', emoji: '🇪🇸' },
-  { city: 'London', code: 'LHR', country: 'Großbritannien', emoji: '🇬🇧' },
-  { city: 'Paris', code: 'CDG', country: 'Frankreich', emoji: '🇫🇷' },
-  { city: 'New York', code: 'JFK', country: 'USA', emoji: '🇺🇸' },
-  { city: 'Bangkok', code: 'BKK', country: 'Thailand', emoji: '🇹🇭' },
-  { city: 'Rom', code: 'FCO', country: 'Italien', emoji: '🇮🇹' },
+interface PopularRoute {
+  city: string;
+  destinationCode: string;
+  country: string;
+  image: string;
+}
+
+interface OriginGroup {
+  origin: string;
+  originCode: string;
+  routes: PopularRoute[];
+}
+
+const POPULAR_ROUTES: OriginGroup[] = [
+  {
+    origin: 'Zürich',
+    originCode: 'ZRH',
+    routes: [
+      { city: 'Barcelona', destinationCode: 'BCN', country: 'Spanien', image: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=400&h=250&fit=crop' },
+      { city: 'London', destinationCode: 'LHR', country: 'Großbritannien', image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=250&fit=crop' },
+      { city: 'Paris', destinationCode: 'CDG', country: 'Frankreich', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400&h=250&fit=crop' },
+      { city: 'New York', destinationCode: 'JFK', country: 'USA', image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&h=250&fit=crop' },
+      { city: 'Bangkok', destinationCode: 'BKK', country: 'Thailand', image: 'https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400&h=250&fit=crop' },
+      { city: 'Rom', destinationCode: 'FCO', country: 'Italien', image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=400&h=250&fit=crop' },
+    ],
+  },
+  {
+    origin: 'Basel',
+    originCode: 'BSL',
+    routes: [
+      { city: 'Mallorca', destinationCode: 'PMI', country: 'Spanien', image: 'https://images.unsplash.com/photo-1571057516885-1d865e5a3aae?w=400&h=250&fit=crop' },
+      { city: 'London', destinationCode: 'LHR', country: 'Großbritannien', image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=250&fit=crop' },
+      { city: 'Berlin', destinationCode: 'BER', country: 'Deutschland', image: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=400&h=250&fit=crop' },
+      { city: 'Amsterdam', destinationCode: 'AMS', country: 'Niederlande', image: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400&h=250&fit=crop' },
+      { city: 'Istanbul', destinationCode: 'IST', country: 'Türkei', image: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400&h=250&fit=crop' },
+      { city: 'Lissabon', destinationCode: 'LIS', country: 'Portugal', image: 'https://images.unsplash.com/photo-1585208798174-6cedd86e019a?w=400&h=250&fit=crop' },
+    ],
+  },
+  {
+    origin: 'Genf',
+    originCode: 'GVA',
+    routes: [
+      { city: 'Paris', destinationCode: 'CDG', country: 'Frankreich', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400&h=250&fit=crop' },
+      { city: 'Barcelona', destinationCode: 'BCN', country: 'Spanien', image: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=400&h=250&fit=crop' },
+      { city: 'Marrakesch', destinationCode: 'RAK', country: 'Marokko', image: 'https://images.unsplash.com/photo-1597212618440-806262de4f6b?w=400&h=250&fit=crop' },
+      { city: 'Dubai', destinationCode: 'DXB', country: 'VAE', image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=250&fit=crop' },
+      { city: 'Nizza', destinationCode: 'NCE', country: 'Frankreich', image: 'https://images.unsplash.com/photo-1533104816931-20fa691ff6ca?w=400&h=250&fit=crop' },
+      { city: 'Athen', destinationCode: 'ATH', country: 'Griechenland', image: 'https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=250&fit=crop' },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -46,6 +92,7 @@ const TRUST_FEATURES = [
 
 export default function HomePage() {
   const router = useRouter();
+  const [activeOrigin, setActiveOrigin] = useState(0);
 
   const handleSearch = () => {
     // Navigation is handled in SearchForm
@@ -55,8 +102,17 @@ export default function HomePage() {
     // Data loading complete
   };
 
-  const handleDestinationClick = (code: string) => {
-    router.push(`/results?destination=${code}`);
+  const handleRouteClick = (originCode: string, destCode: string) => {
+    const departure = new Date();
+    departure.setDate(departure.getDate() + 7);
+    const returnDate = new Date(departure);
+    returnDate.setDate(returnDate.getDate() + 7);
+
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+    router.push(
+      `/results?origin=${originCode}&destination=${destCode}&departure=${fmt(departure)}&return=${fmt(returnDate)}&adults=1&tripType=roundtrip`
+    );
   };
 
   return (
@@ -150,26 +206,63 @@ export default function HomePage() {
               </h2>
             </div>
 
+            {/* Origin Tabs */}
+            <div className="mb-6 flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800 sm:mb-8">
+              {POPULAR_ROUTES.map((group, index) => (
+                <button
+                  key={group.originCode}
+                  onClick={() => setActiveOrigin(index)}
+                  className={cn(
+                    'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 sm:text-base',
+                    activeOrigin === index
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  )}
+                >
+                  {index === activeOrigin && (
+                    <Plane className="mr-1.5 inline-block h-3.5 w-3.5 -rotate-45 sm:h-4 sm:w-4" />
+                  )}
+                  Ab {group.origin}
+                </button>
+              ))}
+            </div>
+
+            {/* Destination Cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-              {POPULAR_DESTINATIONS.map((dest, index) => (
+              {POPULAR_ROUTES[activeOrigin].routes.map((route, index) => (
                 <motion.button
-                  key={dest.code}
+                  key={`${POPULAR_ROUTES[activeOrigin].originCode}-${route.destinationCode}`}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: 0.6 + index * 0.05 }}
-                  whileHover={{ scale: 1.03, y: -2 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => handleDestinationClick(dest.code)}
-                  className="group relative flex flex-col items-start overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 text-left transition-all duration-200 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-700 sm:p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2"
-                  aria-label={`Flüge nach ${dest.city} suchen`}
+                  onClick={() =>
+                    handleRouteClick(
+                      POPULAR_ROUTES[activeOrigin].originCode,
+                      route.destinationCode
+                    )
+                  }
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2"
+                  aria-label={`Flüge von ${POPULAR_ROUTES[activeOrigin].origin} nach ${route.city} suchen`}
                 >
-                  <span className="relative text-2xl sm:text-3xl transition-transform duration-200 group-hover:scale-110">{dest.emoji}</span>
-                  <span className="relative mt-2 text-sm font-bold text-gray-800 dark:text-gray-200 sm:text-base">
-                    {dest.city}
-                  </span>
-                  <span className="relative text-xs text-gray-500 dark:text-gray-400">
-                    {dest.country} · {dest.code}
-                  </span>
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <Image
+                      src={route.image}
+                      alt={route.city}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      unoptimized
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="absolute bottom-3 left-3">
+                      <span className="text-sm font-bold text-white sm:text-base">
+                        {route.city}
+                      </span>
+                      <span className="block text-xs text-white/80">
+                        {route.country}
+                      </span>
+                    </div>
+                  </div>
                 </motion.button>
               ))}
             </div>
