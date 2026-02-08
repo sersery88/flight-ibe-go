@@ -267,6 +267,7 @@ function MobileFilterSheet({ isOpen, onClose, offers, filters, onFiltersChange, 
               filters={filters}
               onFiltersChange={onFiltersChange}
               className="border-0 shadow-none p-0"
+              hideHeader
             />
           </div>
 

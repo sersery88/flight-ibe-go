@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { SlidersHorizontal, ChevronDown, ChevronUp, Luggage, ArrowRight, X, RotateCcw } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown, ChevronUp, Luggage, ArrowRight, X, RotateCcw, Plane } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox';
 import { cn, formatCurrency, parseDuration, formatDuration } from '@/lib/utils';
@@ -173,13 +173,15 @@ const DEFAULT_FILTERS: FlightFilters = {
 // ============================================================================
 
 interface FilterSidebarProps {
+  /** Hide the header (used when embedded in MobileFilterSheet which has its own) */
+  hideHeader?: boolean;
   offers: FlightOffer[];
   filters: FlightFilters;
   onFiltersChange: (filters: FlightFilters) => void;
   className?: string;
 }
 
-export function FilterSidebar({ offers, filters, onFiltersChange, className }: FilterSidebarProps) {
+export function FilterSidebar({ offers, filters, onFiltersChange, className, hideHeader }: FilterSidebarProps) {
   const hasReturnFlight = offers.length > 0 && offers[0].itineraries.length > 1;
 
   // === Airlines ===
@@ -295,24 +297,26 @@ export function FilterSidebar({ offers, filters, onFiltersChange, className }: F
 
   return (
     <div className={cn('rounded-2xl border border-border bg-card p-4 shadow-sm', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between pb-2">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-          <span className="font-bold text-base">Filter</span>
+      {/* Header — hidden when embedded in MobileFilterSheet */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between pb-2">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <span className="font-bold text-base">Filter</span>
+            {activeFilterCount > 0 && (
+              <Badge className="bg-pink-500 text-white border-0 text-[10px] px-1.5 py-0">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </div>
           {activeFilterCount > 0 && (
-            <Badge className="bg-pink-500 text-white border-0 text-[10px] px-1.5 py-0">
-              {activeFilterCount}
-            </Badge>
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Zurücksetzen
+            </Button>
           )}
         </div>
-        {activeFilterCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
-            <RotateCcw className="h-3.5 w-3.5" />
-            Zurücksetzen
-          </Button>
-        )}
-      </div>
+      )}
 
       {/* Stops */}
       {stopOptions.length > 0 && (
@@ -344,6 +348,32 @@ export function FilterSidebar({ offers, filters, onFiltersChange, className }: F
               <Luggage className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
               <span>{baggageStats.withoutBaggage} nur Handgepäck</span>
             </div>
+          </div>
+        </FilterSection>
+      )}
+
+      {/* Airlines — directly after baggage, always open */}
+      {airlines.length > 0 && (
+        <FilterSection title="Airlines" defaultOpen={true}>
+          <div className="space-y-0.5">
+            {airlines.map((airline) => (
+              <FilterCheckbox
+                key={airline.code}
+                checked={filters.airlines.includes(airline.code)}
+                onChange={() => toggleAirline(airline.code)}
+                trailing={
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-pink-600 dark:text-pink-400 font-medium">ab {formatCurrency(airline.minPrice, priceStats.currency)}</span>
+                    <span>({airline.count})</span>
+                  </span>
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <Plane className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>{formatAirlineName(airline.code)}</span>
+                </span>
+              </FilterCheckbox>
+            ))}
           </div>
         </FilterSection>
       )}
@@ -462,28 +492,7 @@ export function FilterSidebar({ offers, filters, onFiltersChange, className }: F
         </FilterSection>
       )}
 
-      {/* Airlines */}
-      {airlines.length > 0 && (
-        <FilterSection title="Airlines" defaultOpen={false}>
-          <div className="space-y-0.5">
-            {airlines.map((airline) => (
-              <FilterCheckbox
-                key={airline.code}
-                checked={filters.airlines.includes(airline.code)}
-                onChange={() => toggleAirline(airline.code)}
-                trailing={
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-pink-600 dark:text-pink-400 font-medium">ab {formatCurrency(airline.minPrice, priceStats.currency)}</span>
-                    <span>({airline.count})</span>
-                  </span>
-                }
-              >
-                {formatAirlineName(airline.code)}
-              </FilterCheckbox>
-            ))}
-          </div>
-        </FilterSection>
-      )}
+      {/* Airlines section moved above (after Gepäck) */}
     </div>
   );
 }
