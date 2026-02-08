@@ -258,28 +258,27 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             </div>
           ))}
 
-          {/* Exit row indicators — pulsing dots on both outer edges */}
+          {/* Exit signs — green emergency exit badge on outer edges */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
             if (!exitRows.has(rowNum)) return null;
+            const exitBadge = (
+              <span className="inline-flex items-center gap-px rounded bg-emerald-600 px-1 py-0.5 shadow-sm shadow-emerald-500/30 animate-pulse">
+                <span className="text-[7px] font-black text-white tracking-wider leading-none">EXIT</span>
+              </span>
+            );
             return (
               <React.Fragment key={`exit-${rowNum}`}>
                 <div
-                  className="flex items-center justify-end pr-0.5"
+                  className="flex items-center justify-center pointer-events-none"
                   style={{ gridRow, gridColumn: 2 }}
                 >
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-50" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-                  </span>
+                  {exitBadge}
                 </div>
                 <div
-                  className="flex items-center justify-start pl-0.5"
+                  className="flex items-center justify-center pointer-events-none"
                   style={{ gridRow, gridColumn: rightLabelCol - 1 }}
                 >
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-50" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-                  </span>
+                  {exitBadge}
                 </div>
               </React.Fragment>
             );
