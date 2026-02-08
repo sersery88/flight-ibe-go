@@ -55,10 +55,10 @@ export const SeatCell = React.memo(function SeatCell({
 }: SeatCellProps) {
   const disabled = status === 'BLOCKED' || status === 'OCCUPIED';
 
-  // Determine category — standard seats above median price → preferred
+  // Determine category — standard seats above price threshold → preferred (violet)
   const category = useMemo(() => {
     const base = getSeatCategory(seat.characteristicsCodes);
-    if (base === 'standard' && price != null && price > 0 && medianPrice != null && medianPrice > 0 && price > medianPrice * 1.2) {
+    if (base === 'standard' && price != null && price > 0 && medianPrice != null && medianPrice > 0 && isFinite(medianPrice) && price >= medianPrice) {
       return 'preferred' as const;
     }
     return base;

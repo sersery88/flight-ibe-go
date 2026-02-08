@@ -160,7 +160,9 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
   const rightLabelCol = totalCols;
 
   // Calculate median price of available seats for preferred tier detection
-  const medianPrice = useMemo(() => {
+  // Price threshold: seats above this are "preferred" (violet)
+  // Uses the boundary between the lower 60% and upper 40% of distinct prices
+  const preferredThreshold = useMemo(() => {
     const prices: number[] = [];
     for (const seat of deck.seats) {
       if (!seat.travelerPricing) continue;
@@ -172,7 +174,14 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
     }
     if (prices.length === 0) return 0;
     prices.sort((a, b) => a - b);
-    return prices[Math.floor(prices.length / 2)];
+
+    const min = prices[0];
+    const max = prices[prices.length - 1];
+    // Need at least 10% price spread to differentiate
+    if (max - min < min * 0.1) return Infinity; // All same price → no preferred tier
+    
+    // Threshold at 60th percentile — top 40% are "preferred"
+    return prices[Math.floor(prices.length * 0.6)];
   }, [deck.seats]);
 
   // Handle seat interaction (mobile vs desktop)
@@ -341,7 +350,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                     passengerNumber={passengerNumber}
                     price={price}
                     currency={currency}
-                    medianPrice={medianPrice}
+                    medianPrice={preferredThreshold}
                     onSelect={() => handleSeatInteraction(seat)}
                     compact={compact}
                     dimmed={dimmed}
