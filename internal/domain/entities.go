@@ -262,6 +262,7 @@ type SeatmapData struct {
 	Decks                  []Deck                  `json:"decks"`
 	AircraftCabinAmenities *AircraftCabinAmenities `json:"aircraftCabinAmenities,omitempty"`
 	AvailableSeatsCounters []AvailableSeatsCounter `json:"availableSeatsCounters,omitempty"`
+	Dictionaries           *SeatmapDictionaries    `json:"dictionaries,omitempty"`
 }
 
 // OperatingFlight represents the operating carrier (for codeshares)
@@ -340,9 +341,25 @@ type AmenityPower struct {
 
 // AmenitySeat describes seat physical characteristics
 type AmenitySeat struct {
-	LegSpace  int    `json:"legSpace,omitempty"`
-	SpaceUnit string `json:"spaceUnit,omitempty"`
-	Tilt      string `json:"tilt,omitempty"`
+	LegSpace    int     `json:"legSpace,omitempty"`
+	SpaceUnit   string  `json:"spaceUnit,omitempty"`
+	Tilt        string  `json:"tilt,omitempty"`
+	AmenityType string  `json:"amenityType,omitempty"`
+	Medias      []Media `json:"medias,omitempty"`
+}
+
+// Media represents images/videos associated with amenities
+type Media struct {
+	Title       string             `json:"title,omitempty"`
+	Href        string             `json:"href,omitempty"`
+	MediaType   string             `json:"mediaType,omitempty"`
+	Description *QualifiedFreeText `json:"description,omitempty"`
+}
+
+// QualifiedFreeText represents localized text
+type QualifiedFreeText struct {
+	Text string `json:"text,omitempty"`
+	Lang string `json:"lang,omitempty"`
 }
 
 // AmenityWifi describes wifi availability
