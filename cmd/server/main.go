@@ -143,6 +143,8 @@ func run(logger *slog.Logger) error {
 		FlightService:    flightService,
 		LocationSearcher: amadeusAdapter,
 		SeatmapProvider:  amadeusAdapter,
+		FlightSearcher:   amadeusAdapter, // Booking flow: pricing with ancillaries
+		FlightBooker:     amadeusAdapter, // Booking flow: PNR creation
 		HealthChecks:     healthChecks,
 		RateLimitRPS:   config.RateLimitRPS,
 		RateLimitBurst: config.RateLimitBurst,

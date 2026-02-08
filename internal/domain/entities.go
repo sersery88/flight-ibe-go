@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -372,4 +373,101 @@ type AmenityBeverage struct {
 type AvailableSeatsCounter struct {
 	TravelerID string `json:"travelerId"`
 	Value      int    `json:"value"`
+}
+
+// === Booking Flow ===
+
+// TravelerData represents passenger data from the booking form
+type TravelerData struct {
+	ID          string    `json:"id"`
+	Type        string    `json:"type"`        // ADULT, CHILD, INFANT
+	Gender      string    `json:"gender"`      // MALE, FEMALE
+	FirstName   string    `json:"firstName"`
+	LastName    string    `json:"lastName"`
+	DateOfBirth string    `json:"dateOfBirth"` // YYYY-MM-DD
+	Nationality string    `json:"nationality"` // ISO 2-letter
+	FQTV        *FQTVData `json:"fqtv,omitempty"`
+}
+
+// FQTVData represents Frequent Traveler Verification data
+type FQTVData struct {
+	ProgramOwner string `json:"programOwner"` // IATA airline code
+	MemberID     string `json:"memberId"`
+}
+
+// ContactData represents booking contact information
+type ContactData struct {
+	Email            string `json:"email"`
+	Phone            string `json:"phone"`
+	PhoneCountryCode string `json:"phoneCountryCode"`
+}
+
+// CreateOrderRequest is the request for creating a PNR
+type CreateOrderRequest struct {
+	Offer     FlightOffer    `json:"offer"`
+	Travelers []TravelerData `json:"travelers"`
+	Contact   ContactData    `json:"contact"`
+}
+
+// CreateOrderResponse is the response from PNR creation
+type CreateOrderResponse struct {
+	OrderID      string          `json:"orderId"`
+	PNRReference string          `json:"pnrReference"`
+	AmadeusData  json.RawMessage `json:"amadeusData,omitempty"`
+}
+
+// PricingRequest is the request for pricing with ancillaries
+type PricingRequest struct {
+	Offers  []FlightOffer `json:"flightOffers"`
+	Include []string      `json:"include"` // bags, other-services, detailed-fare-rules, credit-card-fees
+}
+
+// PricingResponse is the response from pricing with ancillaries
+type PricingResponse struct {
+	FlightOffers   []FlightOffer   `json:"flightOffers"`
+	BagOptions     []BagOption     `json:"bagOptions,omitempty"`
+	ServiceOptions []ServiceOption `json:"serviceOptions,omitempty"`
+	FareRules      []FareRuleGroup `json:"fareRules,omitempty"`
+	CreditCardFees []CreditCardFee `json:"creditCardFees,omitempty"`
+}
+
+// BagOption represents an additional bag that can be purchased
+type BagOption struct {
+	TravelerID string  `json:"travelerId"`
+	SegmentID  string  `json:"segmentId"`
+	Weight     int     `json:"weight"`
+	WeightUnit string  `json:"weightUnit"`
+	Quantity   int     `json:"maxQuantity"`
+	Price      float64 `json:"price"`
+	Currency   string  `json:"currency"`
+	Type       string  `json:"type"` // CHECKED_BAG, SPORT_EQUIPMENT
+}
+
+// ServiceOption represents an additional service (priority boarding, etc.)
+type ServiceOption struct {
+	Type     string  `json:"type"` // PRIORITY_BOARDING, AIRPORT_CHECKIN
+	Price    float64 `json:"price"`
+	Currency string  `json:"currency"`
+}
+
+// FareRuleGroup groups fare rules by segment
+type FareRuleGroup struct {
+	SegmentID string     `json:"segmentId"`
+	Rules     []FareRule `json:"rules"`
+}
+
+// FareRule represents a single fare rule
+type FareRule struct {
+	Category      string  `json:"category"` // REFUND, EXCHANGE, REVALIDATION, REISSUE
+	NotApplicable bool    `json:"notApplicable"`
+	MaxPenalty    float64 `json:"maxPenalty,omitempty"`
+	Currency      string  `json:"currency,omitempty"`
+	Description   string  `json:"description,omitempty"`
+}
+
+// CreditCardFee represents credit card surcharges
+type CreditCardFee struct {
+	Brand    string  `json:"brand"`
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"`
 }

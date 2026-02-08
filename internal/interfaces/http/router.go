@@ -21,6 +21,10 @@ type RouterConfig struct {
 	LocationSearcher domain.LocationSearcher
 	SeatmapProvider  domain.SeatmapProvider
 	
+	// Booking flow dependencies
+	FlightSearcher domain.FlightSearcher
+	FlightBooker   domain.FlightBooker
+	
 	// Health checks
 	HealthChecks []domain.HealthChecker
 	
@@ -105,6 +109,12 @@ func NewRouter(config RouterConfig) *gin.Engine {
 		seatmapHandler = NewSeatmapHandler(config.SeatmapProvider, config.Logger)
 	}
 
+	// Order handler for booking flow (optional — only registered if dependencies are available)
+	var orderHandler *OrderHandler
+	if config.FlightSearcher != nil && config.FlightBooker != nil && config.SeatmapProvider != nil {
+		orderHandler = NewOrderHandler(config.FlightSearcher, config.FlightBooker, config.SeatmapProvider, config.Logger)
+	}
+
 	// API v1
 	v1 := router.Group("/api/v1")
 	{
@@ -119,6 +129,15 @@ func NewRouter(config RouterConfig) *gin.Engine {
 			flights.DELETE("/orders/:id", flightHandler.CancelBooking)
 			if seatmapHandler != nil {
 				flights.POST("/seatmap", seatmapHandler.GetSeatmap)
+			}
+			// Booking flow routes
+			if orderHandler != nil {
+				flights.POST("/price-ancillaries", orderHandler.PriceOffers)
+				flights.POST("/order", orderHandler.CreateOrder)
+				flights.GET("/order/:id", orderHandler.GetOrder)
+				flights.DELETE("/order/:id", orderHandler.CancelOrder)
+				flights.POST("/order/:id/cancel", orderHandler.CancelOrderBeacon)
+				flights.GET("/seatmap/order/:id", orderHandler.GetSeatmapByOrder)
 			}
 		}
 		v1.GET("/locations", locationHandler.SearchLocations)
@@ -137,6 +156,15 @@ func NewRouter(config RouterConfig) *gin.Engine {
 			flights.DELETE("/orders/:id", flightHandler.CancelBooking)
 			if seatmapHandler != nil {
 				flights.POST("/seatmap", seatmapHandler.GetSeatmap)
+			}
+			// Booking flow routes
+			if orderHandler != nil {
+				flights.POST("/price-ancillaries", orderHandler.PriceOffers)
+				flights.POST("/order", orderHandler.CreateOrder)
+				flights.GET("/order/:id", orderHandler.GetOrder)
+				flights.DELETE("/order/:id", orderHandler.CancelOrder)
+				flights.POST("/order/:id/cancel", orderHandler.CancelOrderBeacon)
+				flights.GET("/seatmap/order/:id", orderHandler.GetSeatmapByOrder)
 			}
 		}
 		api.GET("/locations", locationHandler.SearchLocations)

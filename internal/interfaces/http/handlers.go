@@ -489,3 +489,218 @@ type HealthResponse struct {
 	Status string                          `json:"status"`
 	Checks map[string]domain.HealthStatus  `json:"checks,omitempty"`
 }
+
+// === Order Handler (Booking Flow) ===
+
+// OrderHandler handles booking flow order-related HTTP requests
+type OrderHandler struct {
+	searcher domain.FlightSearcher
+	booker   domain.FlightBooker
+	seatmap  domain.SeatmapProvider
+	logger   *slog.Logger
+}
+
+// NewOrderHandler creates a new OrderHandler
+func NewOrderHandler(searcher domain.FlightSearcher, booker domain.FlightBooker, seatmap domain.SeatmapProvider, logger *slog.Logger) *OrderHandler {
+	return &OrderHandler{
+		searcher: searcher,
+		booker:   booker,
+		seatmap:  seatmap,
+		logger:   logger,
+	}
+}
+
+// PriceOffers handles pricing with ancillaries
+// POST /api/flights/price-ancillaries
+func (h *OrderHandler) PriceOffers(c *gin.Context) {
+	var req domain.PricingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "invalid pricing request",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	if len(req.Offers) == 0 {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: "at least one flight offer is required",
+		})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "pricing offers with ancillaries",
+		slog.Int("offerCount", len(req.Offers)),
+		slog.Any("include", req.Include),
+	)
+
+	response, err := h.searcher.PriceOffersWithAncillaries(c.Request.Context(), req.Offers, req.Include)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "pricing with ancillaries failed",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "pricing failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// CreateOrder handles PNR creation
+// POST /api/flights/order
+func (h *OrderHandler) CreateOrder(c *gin.Context) {
+	var req domain.CreateOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "invalid create order request",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	if len(req.Travelers) == 0 {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: "at least one traveler is required",
+		})
+		return
+	}
+
+	if req.Contact.Email == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: "contact email is required",
+		})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "creating booking order",
+		slog.Int("travelerCount", len(req.Travelers)),
+		slog.String("contactEmail", req.Contact.Email),
+	)
+
+	response, err := h.booker.CreateBookingOrder(c.Request.Context(), req)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "create booking order failed",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "booking order creation failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "booking order created",
+		slog.String("orderId", response.OrderID),
+		slog.String("pnr", response.PNRReference),
+	)
+
+	c.JSON(http.StatusCreated, response)
+}
+
+// GetOrder retrieves a booking order
+// GET /api/flights/order/:id
+func (h *OrderHandler) GetOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "order ID required"})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "getting booking order",
+		slog.String("orderId", orderID),
+	)
+
+	response, err := h.booker.GetBookingOrder(c.Request.Context(), orderID)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "get booking order failed",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "failed to retrieve order",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// CancelOrder cancels a booking order
+// DELETE /api/flights/order/:id
+func (h *OrderHandler) CancelOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "order ID required"})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "cancelling booking order",
+		slog.String("orderId", orderID),
+	)
+
+	if err := h.booker.CancelOrder(c.Request.Context(), orderID); err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "cancel booking order failed",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "cancellation failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "booking order cancelled",
+		slog.String("orderId", orderID),
+	)
+
+	c.JSON(http.StatusOK, SuccessResponse{Message: "order cancelled successfully"})
+}
+
+// CancelOrderBeacon cancels a booking order (POST variant for sendBeacon)
+// POST /api/flights/order/:id/cancel
+func (h *OrderHandler) CancelOrderBeacon(c *gin.Context) {
+	h.CancelOrder(c)
+}
+
+// GetSeatmapByOrder retrieves seatmap for a booking order
+// GET /api/flights/seatmap/order/:id
+func (h *OrderHandler) GetSeatmapByOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "order ID required"})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "fetching seatmap by order",
+		slog.String("orderId", orderID),
+	)
+
+	response, err := h.seatmap.GetSeatmapByOrder(c.Request.Context(), orderID)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "seatmap by order failed",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "seatmap request failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

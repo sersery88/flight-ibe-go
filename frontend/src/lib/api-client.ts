@@ -272,3 +272,121 @@ export interface FlightDestination {
     currency?: string;
   };
 }
+
+// ============================================================================
+// Booking Flow API (Phase 2: PNR Management)
+// ============================================================================
+
+export interface TravelerData {
+  id: string;
+  type: 'ADULT' | 'CHILD' | 'INFANT';
+  gender: 'MALE' | 'FEMALE';
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  nationality: string; // ISO 2-letter
+  fqtv?: {
+    programOwner: string; // IATA airline code
+    memberId: string;
+  };
+}
+
+export interface ContactData {
+  email: string;
+  phone: string;
+  phoneCountryCode: string;
+}
+
+export interface CreateOrderRequest {
+  offer: FlightOffer;
+  travelers: TravelerData[];
+  contact: ContactData;
+}
+
+export interface CreateOrderResponse {
+  orderId: string;
+  pnrReference: string;
+  amadeusData?: unknown;
+}
+
+export interface PricingResponse {
+  flightOffers: FlightOffer[];
+  bagOptions?: Array<{
+    travelerId: string;
+    segmentId: string;
+    weight: number;
+    weightUnit: string;
+    maxQuantity: number;
+    price: number;
+    currency: string;
+    type: string;
+  }>;
+  serviceOptions?: Array<{
+    type: string;
+    price: number;
+    currency: string;
+  }>;
+  fareRules?: Array<{
+    segmentId: string;
+    rules: Array<{
+      category: string;
+      notApplicable: boolean;
+      maxPenalty?: number;
+      currency?: string;
+      description?: string;
+    }>;
+  }>;
+  creditCardFees?: Array<{
+    brand: string;
+    amount: number;
+    currency: string;
+  }>;
+}
+
+// Price offers with ancillaries (bags, fare rules, etc.)
+// Go: POST /api/flights/price-ancillaries
+export async function priceOffersWithAncillaries(
+  offers: FlightOffer[],
+  include: string[] = ['bags', 'other-services', 'detailed-fare-rules']
+): Promise<PricingResponse> {
+  return apiClient.post<PricingResponse>('/flights/price-ancillaries', {
+    flightOffers: offers,
+    include,
+  });
+}
+
+// Create a booking order (PNR)
+// Go: POST /api/flights/order
+export async function createBookingOrder(data: CreateOrderRequest): Promise<CreateOrderResponse> {
+  return apiClient.post<CreateOrderResponse>('/flights/order', data);
+}
+
+// Get a booking order
+// Go: GET /api/flights/order/:id
+export async function getBookingOrder(orderId: string): Promise<CreateOrderResponse> {
+  return apiClient.get<CreateOrderResponse>(`/flights/order/${orderId}`);
+}
+
+// Cancel a booking order
+// Go: DELETE /api/flights/order/:id
+export async function cancelBookingOrder(orderId: string): Promise<void> {
+  return apiClient.delete<void>(`/flights/order/${orderId}`);
+}
+
+// Cancel a booking order via beacon (POST for sendBeacon compatibility)
+// Go: POST /api/flights/order/:id/cancel
+export function cancelBookingOrderBeacon(orderId: string): void {
+  const url = `${API_BASE_URL}/flights/order/${orderId}/cancel`;
+  if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+    navigator.sendBeacon(url);
+  } else {
+    // Fallback to fetch
+    fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
+  }
+}
+
+// Get seatmap by order ID
+// Go: GET /api/flights/seatmap/order/:id
+export async function getSeatmapByOrder(orderId: string): Promise<{ data: SeatmapData[] }> {
+  return apiClient.get<{ data: SeatmapData[] }>(`/flights/seatmap/order/${orderId}`);
+}

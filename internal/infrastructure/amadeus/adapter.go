@@ -377,6 +377,516 @@ func (a *Adapter) GetSeatmap(ctx context.Context, offers []domain.FlightOffer) (
 	return &resp, nil
 }
 
+// PriceOffersWithAncillaries implements domain.FlightSearcher (pricing with ancillary data)
+func (a *Adapter) PriceOffersWithAncillaries(ctx context.Context, offers []domain.FlightOffer, include []string) (*domain.PricingResponse, error) {
+	a.logger.InfoContext(ctx, "pricing offers with ancillaries",
+		slog.Int("offerCount", len(offers)),
+		slog.Any("include", include),
+	)
+
+	// Set type on offers
+	for i := range offers {
+		offers[i].Type = "flight-offer"
+	}
+
+	reqBody := map[string]interface{}{
+		"data": map[string]interface{}{
+			"type":         "flight-offers-pricing",
+			"flightOffers": offers,
+		},
+	}
+
+	// Build query string with include parameters
+	path := "/v1/shopping/flight-offers/pricing"
+	if len(include) > 0 {
+		path += "?include=" + strings.Join(include, ",")
+	}
+
+	body, err := a.doRequest(ctx, "POST", path, reqBody)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "pricing with ancillaries failed",
+			slog.String("error", err.Error()),
+		)
+		return nil, fmt.Errorf("pricing with ancillaries failed: %w", err)
+	}
+
+	a.logger.DebugContext(ctx, "pricing response received",
+		slog.Int("responseSize", len(body)),
+	)
+
+	// Parse the raw response
+	var rawResp struct {
+		Data struct {
+			Type         string                    `json:"type"`
+			FlightOffers []domain.FlightOffer      `json:"flightOffers"`
+		} `json:"data"`
+		Included *json.RawMessage `json:"included,omitempty"`
+		Dictionaries *json.RawMessage `json:"dictionaries,omitempty"`
+	}
+	if err := json.Unmarshal(body, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to parse pricing response: %w", err)
+	}
+
+	result := &domain.PricingResponse{
+		FlightOffers: rawResp.Data.FlightOffers,
+	}
+
+	// Parse bag options from travelerPricings[].fareDetailsBySegment[].amenities / additionalServices
+	result.BagOptions = a.parseBagOptions(body)
+	result.ServiceOptions = a.parseServiceOptions(body)
+	result.FareRules = a.parseFareRules(body)
+	result.CreditCardFees = a.parseCreditCardFees(body)
+
+	a.logger.InfoContext(ctx, "pricing with ancillaries completed",
+		slog.Int("offers", len(result.FlightOffers)),
+		slog.Int("bagOptions", len(result.BagOptions)),
+		slog.Int("serviceOptions", len(result.ServiceOptions)),
+		slog.Int("fareRules", len(result.FareRules)),
+		slog.Int("creditCardFees", len(result.CreditCardFees)),
+	)
+
+	return result, nil
+}
+
+// parseBagOptions extracts bag options from the pricing response
+func (a *Adapter) parseBagOptions(body []byte) []domain.BagOption {
+	var bags []domain.BagOption
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return bags
+	}
+
+	// Try to parse included bags from the response
+	// Amadeus returns bags under included.bags or within travelerPricings
+	var parsed struct {
+		Data struct {
+			FlightOffers []struct {
+				TravelerPricings []struct {
+					TravelerID           string `json:"travelerId"`
+					FareDetailsBySegment []struct {
+						SegmentID string `json:"segmentId"`
+						Amenities []struct {
+							Description   string `json:"description"`
+							IsChargeable  bool   `json:"isChargeable"`
+							AmenityType   string `json:"amenityType"`
+							AmenityProvider struct {
+								Name string `json:"name"`
+							} `json:"amenityProvider"`
+						} `json:"amenities"`
+						AdditionalServices *struct {
+							ChargeableCheckedBags *struct {
+								Weight     int    `json:"weight"`
+								WeightUnit string `json:"weightUnit"`
+								Quantity   int    `json:"quantity"`
+							} `json:"chargeableCheckedBags"`
+						} `json:"additionalServices"`
+					} `json:"fareDetailsBySegment"`
+				} `json:"travelerPricings"`
+			} `json:"flightOffers"`
+		} `json:"data"`
+		Included *struct {
+			DetailedFareRules json.RawMessage `json:"detailed-fare-rules,omitempty"`
+			Bags              []struct {
+				TravelerIDs []string `json:"travelerIds"`
+				SegmentIDs  []string `json:"segmentIds"`
+				Name        string   `json:"name"`
+				Quantity    int      `json:"quantity"`
+				Weight      int      `json:"weight"`
+				WeightUnit  string   `json:"weightUnit"`
+				Price       struct {
+					Amount   string `json:"amount"`
+					Currency string `json:"currency"`
+				} `json:"price"`
+				BookableByTraveler bool   `json:"bookableByTraveler"`
+				Type               string `json:"type"`
+			} `json:"bags,omitempty"`
+		} `json:"included,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		a.logger.Debug("failed to parse bags from response", slog.String("error", err.Error()))
+		return bags
+	}
+
+	// Parse from included.bags if available
+	if parsed.Included != nil {
+		for _, bag := range parsed.Included.Bags {
+			price := 0.0
+			if bag.Price.Amount != "" {
+				fmt.Sscanf(bag.Price.Amount, "%f", &price)
+			}
+			for _, tid := range bag.TravelerIDs {
+				for _, sid := range bag.SegmentIDs {
+					bags = append(bags, domain.BagOption{
+						TravelerID: tid,
+						SegmentID:  sid,
+						Weight:     bag.Weight,
+						WeightUnit: bag.WeightUnit,
+						Quantity:   bag.Quantity,
+						Price:      price,
+						Currency:   bag.Price.Currency,
+						Type:       bag.Type,
+					})
+				}
+			}
+		}
+	}
+
+	// Also parse from travelerPricings additionalServices
+	for _, offer := range parsed.Data.FlightOffers {
+		for _, tp := range offer.TravelerPricings {
+			for _, fd := range tp.FareDetailsBySegment {
+				if fd.AdditionalServices != nil && fd.AdditionalServices.ChargeableCheckedBags != nil {
+					cb := fd.AdditionalServices.ChargeableCheckedBags
+					bags = append(bags, domain.BagOption{
+						TravelerID: tp.TravelerID,
+						SegmentID:  fd.SegmentID,
+						Weight:     cb.Weight,
+						WeightUnit: cb.WeightUnit,
+						Quantity:   cb.Quantity,
+						Type:       "CHECKED_BAG",
+					})
+				}
+			}
+		}
+	}
+
+	return bags
+}
+
+// parseServiceOptions extracts service options from the pricing response
+func (a *Adapter) parseServiceOptions(body []byte) []domain.ServiceOption {
+	var services []domain.ServiceOption
+
+	var parsed struct {
+		Included *struct {
+			OtherServices []struct {
+				Type  string `json:"type"`
+				Price struct {
+					Amount   string `json:"amount"`
+					Currency string `json:"currency"`
+				} `json:"price"`
+			} `json:"other-services,omitempty"`
+		} `json:"included,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return services
+	}
+
+	if parsed.Included != nil {
+		for _, svc := range parsed.Included.OtherServices {
+			price := 0.0
+			if svc.Price.Amount != "" {
+				fmt.Sscanf(svc.Price.Amount, "%f", &price)
+			}
+			services = append(services, domain.ServiceOption{
+				Type:     svc.Type,
+				Price:    price,
+				Currency: svc.Price.Currency,
+			})
+		}
+	}
+
+	return services
+}
+
+// parseFareRules extracts fare rules from the pricing response
+func (a *Adapter) parseFareRules(body []byte) []domain.FareRuleGroup {
+	var fareRules []domain.FareRuleGroup
+
+	var parsed struct {
+		Included *struct {
+			DetailedFareRules []struct {
+				FareNotes []struct {
+					SegmentID string `json:"segmentId,omitempty"`
+					Rules     []struct {
+						Category   string `json:"category"`
+						NotApplicable bool `json:"notApplicable,omitempty"`
+						MaxPenaltyAmount string `json:"maxPenaltyAmount,omitempty"`
+						Currency         string `json:"currency,omitempty"`
+						Descriptions     []struct {
+							Text string `json:"text"`
+						} `json:"descriptions,omitempty"`
+					} `json:"rules,omitempty"`
+				} `json:"fareNotes,omitempty"`
+			} `json:"detailed-fare-rules,omitempty"`
+		} `json:"included,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return fareRules
+	}
+
+	if parsed.Included == nil {
+		return fareRules
+	}
+
+	for _, dfr := range parsed.Included.DetailedFareRules {
+		for _, fn := range dfr.FareNotes {
+			group := domain.FareRuleGroup{
+				SegmentID: fn.SegmentID,
+			}
+			for _, r := range fn.Rules {
+				penalty := 0.0
+				if r.MaxPenaltyAmount != "" {
+					fmt.Sscanf(r.MaxPenaltyAmount, "%f", &penalty)
+				}
+				desc := ""
+				for _, d := range r.Descriptions {
+					if desc != "" {
+						desc += "; "
+					}
+					desc += d.Text
+				}
+				group.Rules = append(group.Rules, domain.FareRule{
+					Category:      r.Category,
+					NotApplicable: r.NotApplicable,
+					MaxPenalty:    penalty,
+					Currency:      r.Currency,
+					Description:   desc,
+				})
+			}
+			if len(group.Rules) > 0 {
+				fareRules = append(fareRules, group)
+			}
+		}
+	}
+
+	return fareRules
+}
+
+// parseCreditCardFees extracts credit card fees from the pricing response
+func (a *Adapter) parseCreditCardFees(body []byte) []domain.CreditCardFee {
+	var fees []domain.CreditCardFee
+
+	var parsed struct {
+		Included *struct {
+			CreditCardFees []struct {
+				Brand string `json:"brand"`
+				Amount string `json:"amount"`
+				Currency string `json:"currency"`
+			} `json:"credit-card-fees,omitempty"`
+		} `json:"included,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return fees
+	}
+
+	if parsed.Included != nil {
+		for _, fee := range parsed.Included.CreditCardFees {
+			amount := 0.0
+			if fee.Amount != "" {
+				fmt.Sscanf(fee.Amount, "%f", &amount)
+			}
+			fees = append(fees, domain.CreditCardFee{
+				Brand:    fee.Brand,
+				Amount:   amount,
+				Currency: fee.Currency,
+			})
+		}
+	}
+
+	return fees
+}
+
+// CreateBookingOrder implements domain.FlightBooker — creates a PNR with traveler data
+func (a *Adapter) CreateBookingOrder(ctx context.Context, req domain.CreateOrderRequest) (*domain.CreateOrderResponse, error) {
+	a.logger.InfoContext(ctx, "creating booking order (PNR)",
+		slog.Int("travelerCount", len(req.Travelers)),
+		slog.String("offerId", req.Offer.ID),
+	)
+
+	// Build Amadeus travelers from our TravelerData
+	travelers := make([]map[string]interface{}, len(req.Travelers))
+	for i, t := range req.Travelers {
+		traveler := map[string]interface{}{
+			"id":          t.ID,
+			"dateOfBirth": t.DateOfBirth,
+			"gender":      t.Gender,
+			"name": map[string]string{
+				"firstName": strings.ToUpper(t.FirstName),
+				"lastName":  strings.ToUpper(t.LastName),
+			},
+			"documents": []map[string]interface{}{
+				{
+					"nationality":  t.Nationality,
+					"documentType": "IDENTITY_CARD",
+				},
+			},
+		}
+
+		// Add contact info only to the first traveler
+		if i == 0 {
+			contact := map[string]interface{}{
+				"emailAddress": req.Contact.Email,
+				"phones": []map[string]interface{}{
+					{
+						"number":              req.Contact.Phone,
+						"countryCallingCode":   req.Contact.PhoneCountryCode,
+						"deviceType":           "MOBILE",
+					},
+				},
+			}
+			traveler["contact"] = contact
+		}
+
+		// Add FQTV / loyalty program if present
+		if t.FQTV != nil && t.FQTV.ProgramOwner != "" && t.FQTV.MemberID != "" {
+			traveler["loyaltyPrograms"] = []map[string]string{
+				{
+					"programOwner": t.FQTV.ProgramOwner,
+					"id":           t.FQTV.MemberID,
+				},
+			}
+		}
+
+		travelers[i] = traveler
+	}
+
+	// Ticketing agreement: DELAY_TO_QUEUE with 6h time limit
+	ticketingDateTime := time.Now().UTC().Add(6 * time.Hour).Format("2006-01-02T15:04:05")
+
+	// Set offer type
+	req.Offer.Type = "flight-offer"
+
+	reqBody := map[string]interface{}{
+		"data": map[string]interface{}{
+			"type":         "flight-order",
+			"flightOffers": []domain.FlightOffer{req.Offer},
+			"travelers":    travelers,
+			"ticketingAgreement": map[string]interface{}{
+				"option":   "DELAY_TO_QUEUE",
+				"dateTime": ticketingDateTime,
+			},
+		},
+	}
+
+	a.logger.DebugContext(ctx, "sending create order request",
+		slog.String("ticketingDateTime", ticketingDateTime),
+	)
+
+	body, err := a.doRequest(ctx, "POST", "/v1/booking/flight-orders", reqBody)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "create booking order failed",
+			slog.String("error", err.Error()),
+		)
+		return nil, fmt.Errorf("create booking order failed: %w", err)
+	}
+
+	a.logger.DebugContext(ctx, "create order response received",
+		slog.Int("responseSize", len(body)),
+	)
+
+	// Parse response to extract orderId and PNR
+	var resp struct {
+		Data struct {
+			ID                string `json:"id"`
+			Type              string `json:"type"`
+			AssociatedRecords []struct {
+				Reference        string `json:"reference"`
+				CreationDate     string `json:"creationDate"`
+				OriginSystemCode string `json:"originSystemCode"`
+			} `json:"associatedRecords"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse create order response: %w", err)
+	}
+
+	pnrRef := ""
+	if len(resp.Data.AssociatedRecords) > 0 {
+		pnrRef = resp.Data.AssociatedRecords[0].Reference
+	}
+
+	a.logger.InfoContext(ctx, "booking order created",
+		slog.String("orderId", resp.Data.ID),
+		slog.String("pnr", pnrRef),
+	)
+
+	return &domain.CreateOrderResponse{
+		OrderID:      resp.Data.ID,
+		PNRReference: pnrRef,
+		AmadeusData:  json.RawMessage(body),
+	}, nil
+}
+
+// GetBookingOrder implements domain.FlightBooker — retrieves a booking order with raw data
+func (a *Adapter) GetBookingOrder(ctx context.Context, orderID string) (*domain.CreateOrderResponse, error) {
+	a.logger.InfoContext(ctx, "getting booking order",
+		slog.String("orderId", orderID),
+	)
+
+	path := fmt.Sprintf("/v1/booking/flight-orders/%s", orderID)
+	body, err := a.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "get booking order failed",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+		return nil, fmt.Errorf("get booking order failed: %w", err)
+	}
+
+	var resp struct {
+		Data struct {
+			ID                string `json:"id"`
+			AssociatedRecords []struct {
+				Reference string `json:"reference"`
+			} `json:"associatedRecords"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse get order response: %w", err)
+	}
+
+	pnrRef := ""
+	if len(resp.Data.AssociatedRecords) > 0 {
+		pnrRef = resp.Data.AssociatedRecords[0].Reference
+	}
+
+	a.logger.InfoContext(ctx, "booking order retrieved",
+		slog.String("orderId", resp.Data.ID),
+		slog.String("pnr", pnrRef),
+	)
+
+	return &domain.CreateOrderResponse{
+		OrderID:      resp.Data.ID,
+		PNRReference: pnrRef,
+		AmadeusData:  json.RawMessage(body),
+	}, nil
+}
+
+// GetSeatmapByOrder implements domain.SeatmapProvider — seatmap via order ID
+func (a *Adapter) GetSeatmapByOrder(ctx context.Context, orderID string) (*domain.SeatmapResponse, error) {
+	a.logger.InfoContext(ctx, "fetching seatmap by order",
+		slog.String("orderId", orderID),
+	)
+
+	path := fmt.Sprintf("/v1/shopping/seatmaps?flight-orderId=%s", url.QueryEscape(orderID))
+	body, err := a.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "seatmap by order request failed",
+			slog.String("orderId", orderID),
+			slog.String("error", err.Error()),
+		)
+		return nil, fmt.Errorf("seatmap by order request failed: %w", err)
+	}
+
+	var resp domain.SeatmapResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse seatmap response: %w", err)
+	}
+
+	a.logger.InfoContext(ctx, "seatmap by order retrieved",
+		slog.String("orderId", orderID),
+		slog.Int("seatmapCount", len(resp.Data)),
+	)
+
+	return &resp, nil
+}
+
 // SearchLocations implements domain.LocationSearcher
 func (a *Adapter) SearchLocations(ctx context.Context, keyword, subType string) ([]domain.LocationResult, error) {
 	params := url.Values{}

@@ -11,6 +11,8 @@ type FlightSearcher interface {
 	SearchOffers(ctx context.Context, req FlightSearchRequest) (*FlightSearchResponse, error)
 	// PriceOffers gets updated pricing for selected offers
 	PriceOffers(ctx context.Context, offers []FlightOffer) (*FlightSearchResponse, error)
+	// PriceOffersWithAncillaries gets pricing with optional ancillary data (bags, fare rules, etc.)
+	PriceOffersWithAncillaries(ctx context.Context, offers []FlightOffer, include []string) (*PricingResponse, error)
 }
 
 // UpsellProvider defines the port for retrieving branded fare / upsell offers
@@ -21,12 +23,16 @@ type UpsellProvider interface {
 
 // FlightBooker defines the port for booking flights
 type FlightBooker interface {
-	// CreateOrder creates a flight booking
+	// CreateOrder creates a flight booking (legacy)
 	CreateOrder(ctx context.Context, req BookingRequest) (*FlightOrder, error)
 	// GetOrder retrieves an existing booking
 	GetOrder(ctx context.Context, orderID string) (*FlightOrder, error)
 	// CancelOrder cancels a booking
 	CancelOrder(ctx context.Context, orderID string) error
+	// CreateBookingOrder creates a PNR from the booking flow
+	CreateBookingOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error)
+	// GetBookingOrder retrieves a booking order with raw Amadeus data
+	GetBookingOrder(ctx context.Context, orderID string) (*CreateOrderResponse, error)
 }
 
 // FlightCache defines the port for caching flight offers
@@ -91,6 +97,8 @@ type SeatmapProvider interface {
 	// GetSeatmap retrieves the seatmap for flight offers
 	// Returns the full SeatmapResponse including data and dictionaries
 	GetSeatmap(ctx context.Context, offers []FlightOffer) (*SeatmapResponse, error)
+	// GetSeatmapByOrder retrieves the seatmap for a flight order by order ID
+	GetSeatmapByOrder(ctx context.Context, orderID string) (*SeatmapResponse, error)
 }
 
 // FlightStatusProvider defines the port for flight status
