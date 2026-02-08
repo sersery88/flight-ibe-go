@@ -34,6 +34,9 @@ export const GENERIC_SYSTEM_CODES = new Set([
   'PC',                   // Power/charging — appears on ~64%, cabin-wide amenity
   'I',                    // Individual seat (~12-25%) — meaningless flag
   'DE',                   // Discountable (~16%) — pricing flag
+  'U',                    // Upgrade eligible (~4-8%) — internal airline flag, not user-actionable
+  'V',                    // Upgrade seat — synonym of U, internal flag
+  'FC',                   // Free of Charge — pricing flag, shown via green color instead
 ]);
 
 // ============================================================================
