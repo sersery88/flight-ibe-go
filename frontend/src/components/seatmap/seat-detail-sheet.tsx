@@ -79,6 +79,8 @@ export interface SeatDetailSheetProps {
   isWingZone?: boolean;
   isExitRowConfig?: boolean;
   onSelect: (seat: Seat) => void;
+  onDeselect?: (seat: Seat) => void;
+  isSelected?: boolean;
   onClose: () => void;
 }
 
@@ -89,6 +91,8 @@ export function SeatDetailSheet({
   currency,
   isWingZone,
   onSelect,
+  onDeselect,
+  isSelected,
   onClose,
 }: SeatDetailSheetProps) {
   const positionLabel = seat ? getSeatPositionLabel(seat.characteristicsCodes) : null;
@@ -198,8 +202,17 @@ export function SeatDetailSheet({
                 <p className="text-sm text-muted-foreground text-center py-2">Nicht verfügbar.</p>
               )}
 
-              {/* Select button */}
-              {!disabled && status === 'AVAILABLE' && (
+              {/* Select / Deselect button */}
+              {!disabled && status === 'AVAILABLE' && isSelected && onDeselect && seat && (
+                <button
+                  type="button"
+                  onClick={() => { onDeselect(seat); onClose(); }}
+                  className="w-full mt-2 rounded-xl bg-gray-200 dark:bg-gray-700 px-6 py-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200 active:scale-[0.98] transition-all"
+                >
+                  Auswahl aufheben
+                </button>
+              )}
+              {!disabled && status === 'AVAILABLE' && !isSelected && (
                 <button
                   type="button"
                   onClick={handleSelect}

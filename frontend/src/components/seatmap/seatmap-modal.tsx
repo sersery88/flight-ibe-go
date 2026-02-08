@@ -592,7 +592,9 @@ export function SeatmapModal({
         currency={detailSeatCurrency}
         isWingZone={detailSeatWingZone}
         isExitRowConfig={detailSeatExitRow}
+        isSelected={detailSeat ? segmentSelections[activeTravelerId]?.number === detailSeat.number : false}
         onSelect={handleDetailSheetSelect}
+        onDeselect={(seat) => { storeRemoveSeat(segmentId, activeTravelerId); setDetailSeat(null); }}
         onClose={() => setDetailSeat(null)}
       />
 
