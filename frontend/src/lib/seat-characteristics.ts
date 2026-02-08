@@ -21,6 +21,9 @@ export const GENERIC_SYSTEM_CODES = new Set([
   'N',                    // PADIS 9825: No seat at this position / not operational
   'R',                    // PADIS 9825: Right side of aircraft (positional, redundant with column)
   'RS',                   // PADIS 9825: Right side of aircraft (synonym of R)
+  'LS',                   // PADIS 9825: Limited recline — appears on ~40% of ALL seats (cabin-wide, not individual)
+  'O',                    // PADIS 9825: Overwing — zone info (~18-26%), not an individual seat feature
+  'OW',                   // Amadeus synonym of O: Overwing (~16-36%)
 ]);
 
 // ============================================================================
