@@ -192,7 +192,7 @@ export async function searchLocations(keyword: string): Promise<{ data: Location
 // Seatmaps
 // Go: POST /api/flights/seatmap
 export async function getSeatmaps(offers: FlightOffer[]): Promise<{ data: SeatmapData[] }> {
-  return apiClient.post('/flights/seatmap', { flightOffers: offers });
+  return apiClient.post('/flights/seatmap', { offer: offers[0] });
 }
 
 // Create Booking
