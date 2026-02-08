@@ -55,10 +55,12 @@ export const SeatCell = React.memo(function SeatCell({
 }: SeatCellProps) {
   const disabled = status === 'BLOCKED' || status === 'OCCUPIED';
 
-  // Determine category — standard seats above price threshold → preferred (violet)
+  // Determine category from codes + price tier
+  // medianPrice here is actually the "preferred threshold" from seatmap-grid
   const category = useMemo(() => {
     const base = getSeatCategory(seat.characteristicsCodes);
-    if (base === 'standard' && price != null && price > 0 && medianPrice != null && medianPrice > 0 && isFinite(medianPrice) && price >= medianPrice) {
+    // Standard seats above the price threshold → preferred (violet)
+    if (base === 'standard' && price != null && price > 0 && medianPrice != null && medianPrice > 0 && isFinite(medianPrice) && price > medianPrice) {
       return 'preferred' as const;
     }
     return base;
@@ -80,8 +82,9 @@ export const SeatCell = React.memo(function SeatCell({
     if (status === 'OCCUPIED') {
       return { bg: 'bg-gray-400 dark:bg-gray-600', text: 'text-gray-600 dark:text-gray-300', ring: 'ring-gray-300' };
     }
-    // AVAILABLE: free standard → emerald, else category color
-    if (category === 'standard' && (price == null || price === 0)) {
+    // AVAILABLE: free seat (price=0 or FC code) → emerald
+    const isFree = (price == null || price === 0) || seat.characteristicsCodes?.includes('FC');
+    if (category === 'standard' && isFree) {
       return { bg: 'bg-emerald-500', text: 'text-white', ring: 'ring-emerald-400' };
     }
     return { bg: categoryStyle.bg, text: categoryStyle.text, ring: categoryStyle.ring };

@@ -14,16 +14,26 @@ import type { SeatCharacteristicDef, FacilityTypeDef } from '@/types/seatmap';
 // Codes that appear on 90%+ of all seats — purely system/pricing flags.
 // These are NEVER shown in the UI and NEVER used for categorization.
 // ============================================================================
+// Codes that appear on 20-100% of ALL seats — system/zone flags, not individual features.
+// These are ALWAYS filtered from UI display (tooltip, bottom sheet, category detection).
 export const GENERIC_SYSTEM_CODES = new Set([
-  'CH',                   // PADIS 9825: Chargeable seat (appears on ~100% of seats)
-  '1A',                   // Amadeus generic: seat priced by Amadeus system (~20-70%)
-  '1A_AQC_PREMIUM_SEAT',  // Amadeus: "seat has individual pricing" (~95-100%, NOT actually premium!)
-  'N',                    // PADIS 9825: No seat at this position / not operational
-  'R',                    // PADIS 9825: Right side of aircraft (positional, redundant with column)
-  'RS',                   // PADIS 9825: Right side of aircraft (synonym of R)
-  'LS',                   // PADIS 9825: Limited recline — appears on ~40% of ALL seats (cabin-wide, not individual)
-  'O',                    // PADIS 9825: Overwing — zone info (~18-26%), not an individual seat feature
-  'OW',                   // Amadeus synonym of O: Overwing (~16-36%)
+  'CH',                   // Chargeable seat (~100%)
+  '1A',                   // Amadeus: seat priced by system (~20-70%)
+  '1A_AQC_PREMIUM_SEAT',  // Amadeus: "has individual pricing" (~95-100%, NOT premium!)
+  'N',                    // No seat at this position
+  'R',                    // Right side of aircraft (positional)
+  'RS',                   // Right side synonym
+  'LS',                   // Limited recline — cabin-wide (~40%), NOT individual
+  'O',                    // Overwing zone (~18-26%)
+  'OW',                   // Overwing synonym (~16-36%)
+  'H',                    // Aisle-adjacent / handicap proximity (~43%) — NOT wheelchair-specific
+  'AL',                   // Aisle armrest (~8-10%) — too common, positional
+  '9',                    // Center seat (~25-33%) — positional, redundant
+  'W',                    // Window (~20-34%) — positional, shown via seat letter
+  'A',                    // Aisle (~31-48%) — positional, shown via seat letter
+  'PC',                   // Power/charging — appears on ~64%, cabin-wide amenity
+  'I',                    // Individual seat (~12-25%) — meaningless flag
+  'DE',                   // Discountable (~16%) — pricing flag
 ]);
 
 // ============================================================================

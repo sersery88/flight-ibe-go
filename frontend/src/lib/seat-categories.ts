@@ -40,20 +40,32 @@ export interface CategoryStyle {
  * Determine the primary seat category from IATA characteristic codes.
  * Priority order — first match wins.
  */
+/**
+ * Determine seat category from IATA PADIS 9825 + Amadeus characteristic codes.
+ * Priority order matters — exit > preferred > extraleg > bulkhead > bassinet > standard.
+ * 
+ * Based on real Amadeus API analysis (QR 787-9, A380-800, LH A320):
+ * - K (Bulkhead) → always premium priced (122.96€ vs 39.86€ standard)
+ * - E/IE (Exit) → always premium priced, restricted recline + extra legroom
+ * - L/XL (Legroom) → premium priced, extra legroom seats
+ * - B/BK (Bassinet) → specific wall-mounted baby bed seats
+ * - FC (Free of Charge) → complimentary upgrades, lower tier than standard
+ * - U (Upgrade) → seat eligible for upgrade
+ * 
+ * NOT used for categories (too common / system flags):
+ * - H (43%) = aisle proximity, NOT wheelchair-specific
+ * - 1A_AQC_PREMIUM_SEAT (95-100%) = pricing flag, NOT premium
+ * - CH (100%) = chargeable, appears on every seat
+ */
 export function getSeatCategory(codes?: string[]): SeatCategory {
   if (!codes || codes.length === 0) return 'standard';
 
-  // Priority order — first match wins
+  // Priority: exit > preferred > extraleg > bulkhead > bassinet
   if (codes.includes('E') || codes.includes('IE')) return 'exit';
-  // P, PS, EC are real premium indicators. 
-  // 1A_AQC_PREMIUM_SEAT appears on 95-100% of ALL seats — it's a generic pricing flag, NOT premium!
   if (codes.some(c => ['P', 'PS', 'EC'].includes(c))) return 'preferred';
   if (codes.includes('L') || codes.includes('XL')) return 'extraleg';
   if (codes.includes('K')) return 'bulkhead';
   if (codes.includes('B') || codes.includes('BK')) return 'bassinet';
-  if (codes.includes('H')) return 'accessible';
-  // CH = "Chargeable" in Amadeus, NOT pet-friendly. Real pet code would be specific.
-  // if (codes.includes('CH')) return 'pet';
 
   return 'standard';
 }

@@ -160,8 +160,9 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
   const rightLabelCol = totalCols;
 
   // Calculate median price of available seats for preferred tier detection
-  // Price threshold: seats above this are "preferred" (violet)
-  // Uses the boundary between the lower 60% and upper 40% of distinct prices
+  // Price threshold for "preferred" tier:
+  // Find the lowest price among standard seats — anything above it is premium.
+  // This works because Amadeus gives distinct price tiers (e.g. 39.86 / 51.73 / 122.96).
   const preferredThreshold = useMemo(() => {
     const prices: number[] = [];
     for (const seat of deck.seats) {
@@ -172,16 +173,16 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
         if (p > 0) prices.push(p);
       }
     }
-    if (prices.length === 0) return 0;
-    prices.sort((a, b) => a - b);
-
-    const min = prices[0];
-    const max = prices[prices.length - 1];
-    // Need at least 10% price spread to differentiate
-    if (max - min < min * 0.1) return Infinity; // All same price → no preferred tier
+    if (prices.length === 0) return Infinity;
     
-    // Threshold at 60th percentile — top 40% are "preferred"
-    return prices[Math.floor(prices.length * 0.6)];
+    // Get distinct price tiers
+    const uniquePrices = [...new Set(prices)].sort((a, b) => a - b);
+    
+    // Need at least 2 different prices to distinguish tiers
+    if (uniquePrices.length < 2) return Infinity;
+    
+    // Threshold = lowest price. Anything strictly above it = preferred.
+    return uniquePrices[0];
   }, [deck.seats]);
 
   // Handle seat interaction (mobile vs desktop)
