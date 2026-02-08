@@ -1461,27 +1461,46 @@ function NationalitySelect({
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-50 mt-1.5 w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl max-h-64 overflow-hidden"
-          >
-            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Suchen…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 rounded-lg bg-gray-50 dark:bg-gray-700 border-0 text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-pink-500/30"
-                  autoFocus
-                />
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm"
+              onClick={() => { setOpen(false); setSearch(''); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 100 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl bg-white dark:bg-gray-800 shadow-2xl max-h-[70vh] flex flex-col sm:inset-auto sm:absolute sm:bottom-auto sm:top-full sm:mt-1.5 sm:w-full sm:rounded-xl sm:max-h-80"
+            >
+              {/* Drag handle (mobile) */}
+              <div className="flex justify-center pt-2 pb-1 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
               </div>
-            </div>
-            <div className="overflow-y-auto max-h-48">
+              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2 sm:hidden">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Nationalität wählen</span>
+                  <button type="button" onClick={() => { setOpen(false); setSearch(''); }} className="text-gray-400 hover:text-gray-600 p-1">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Suchen…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full h-10 pl-9 pr-3 rounded-lg bg-gray-50 dark:bg-gray-700 border-0 text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-pink-500/30"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1 overscroll-contain">
               {filtered.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-gray-400">Keine Ergebnisse</p>
               ) : (
@@ -1555,6 +1574,7 @@ function NationalitySelect({
               )}
             </div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
