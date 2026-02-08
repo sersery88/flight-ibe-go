@@ -433,7 +433,7 @@ export function SeatmapModal({
               )}
 
               {/* Deck Tabs */}
-              {decks.length > 1 && (
+              {decks.length > 1 ? (
                 <div className="px-4 pb-2 md:px-6">
                   <DeckTabs
                     decks={decks}
@@ -442,7 +442,14 @@ export function SeatmapModal({
                     aircraftCode={aircraftCode}
                   />
                 </div>
-              )}
+              ) : aircraftProfile.decks.length > 1 && decks.length === 1 && !isLoading ? (
+                <div className="mx-4 mb-2 md:mx-6 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2 flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300">
+                  <span>✈️</span>
+                  <span>
+                    {aircraftProfile.name} — Doppelstöckiges Flugzeug. Nur {decks[0]?.deckType === 'UPPER' ? 'Oberdeck' : 'Hauptdeck'} verfügbar.
+                  </span>
+                </div>
+              ) : null}
 
               {/* Available Seats Counter */}
               {!isLoading && !isError && activeSegment?.availableSeatsCounters && (
