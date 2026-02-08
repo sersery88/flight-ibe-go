@@ -217,87 +217,17 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             />
           ))}
 
-          {/* Row numbers + Wing/Exit indicators (LEFT side) */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            const isWing = rowNum >= wingStart && rowNum <= wingEnd;
-
-            return (
+          {/* Row numbers (LEFT side) — clean, no wing/exit decorations */}
+          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => (
               <div
                 key={`row-${rowNum}`}
-                className={[
-                  'text-xs font-medium flex items-center gap-0.5 justify-end pr-1 w-full',
-                  isWing ? 'text-blue-400' : 'text-muted-foreground',
-                ].join(' ')}
+                className="text-xs font-medium text-muted-foreground flex items-center justify-end pr-1 w-full"
                 style={{ gridRow, gridColumn: 1 }}
                 role="rowheader"
               >
-                {isWing && <span className="text-[8px]" title="Flügelbereich">✈</span>}
                 <span>{xToRowLabel.get(rowNum) ?? rowNum}</span>
               </div>
-            );
-          })}
-
-          {/* Exit row labels (RIGHT side) */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            const isExit = exitRows.has(rowNum);
-            if (!isExit) return null;
-
-            return (
-              <div
-                key={`exit-right-${rowNum}`}
-                className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-start pl-1 w-full"
-                style={{ gridRow, gridColumn: rightLabelCol }}
-                title="Notausgang"
-              >
-                <span className="flex items-center gap-0.5">
-                  <span>🚪</span>
-                  <span className="hidden sm:inline">EXIT</span>
-                </span>
-              </div>
-            );
-          })}
-
-          {/* Wing zone background markers */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            const isWing = rowNum >= wingStart && rowNum <= wingEnd;
-            if (!isWing) return null;
-
-            const isFirst = rowNum === wingStart;
-            const isLast = rowNum === wingEnd;
-
-            return (
-              <React.Fragment key={`wing-bg-${rowNum}`}>
-                <div
-                  className={[
-                    'absolute inset-x-0 bg-blue-50/40 dark:bg-blue-950/15 pointer-events-none',
-                    isFirst ? 'border-t border-dashed border-blue-200 dark:border-blue-800' : '',
-                    isLast ? 'border-b border-dashed border-blue-200 dark:border-blue-800' : '',
-                  ].join(' ')}
-                  style={{
-                    gridRow,
-                    gridColumn: `2 / ${rightLabelCol}`,
-                  }}
-                />
-              </React.Fragment>
-            );
-          })}
-
-          {/* Exit row indicator — subtle background behind exit-row seats */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            const isExit = exitRows.has(rowNum);
-            if (!isExit) return null;
-
-            return (
-              <div
-                key={`exit-bg-${rowNum}`}
-                className="bg-amber-400/10 dark:bg-amber-500/10 rounded-sm pointer-events-none"
-                style={{
-                  gridRow,
-                  gridColumn: `2 / ${rightLabelCol}`,
-                }}
-              />
-            );
-          })}
+          ))}
 
           {/* Seats */}
           {deck.seats.map((seat) => {
