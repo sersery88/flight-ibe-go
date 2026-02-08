@@ -1,22 +1,114 @@
 'use client';
 
-import { motion } from 'motion/react';
-import { ArrowLeft, CreditCard, Lock, Sparkles } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Lock, Check, Loader2, ShieldCheck } from 'lucide-react';
+import { Checkbox } from '@base-ui/react/checkbox';
 import { useBookingFlowStore } from '@/stores/booking-flow-store';
 import { useSeatSelectionStore } from '@/stores/seat-selection-store';
+import { BookingReview } from '@/components/booking/booking-review';
+import { PaymentMethods } from '@/components/booking/payment-methods';
+import { PriceSummary } from '@/components/booking/price-summary';
+import { FareRulesAccordion, type FareRuleGroup } from '@/components/booking/fare-rules-accordion';
 import { formatCurrency } from '@/lib/utils';
 
 // ============================================================================
-// StepPayment — Placeholder (Phase 4 will expand this)
+// StepPayment — Full Implementation
 // ============================================================================
 
 export function StepPayment() {
-  const { offer, travelers, pnrReference, setStep } = useBookingFlowStore();
+  const {
+    offer,
+    travelers,
+    pnrReference,
+    ancillaries,
+    pricingResult,
+    setStep,
+    setPayment,
+  } = useBookingFlowStore();
+
   const seatTotalCost = useSeatSelectionStore((s) => s.totalSeatCost());
+  const seatSelections = useSeatSelectionStore((s) => s.selections);
+
+  // Local state
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [agbAccepted, setAgbAccepted] = useState(false);
+  const [stornoAccepted, setStornoAccepted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ---- Price calculations ----
+  const basePrice = offer ? parseFloat(offer.price.grandTotal) : 0;
+  const currency = offer?.price.currency || 'EUR';
+
+  const taxes = useMemo(() => {
+    if (!offer?.price.taxes) return 0;
+    return offer.price.taxes.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+  }, [offer]);
+
+  // Bag cost from ancillaries
+  const bagCost = useMemo(() => {
+    return ancillaries
+      .filter((a) => a.type === 'EXTRA_BAG')
+      .reduce((sum, a) => sum + a.price, 0);
+  }, [ancillaries]);
+
+  // Service cost (priority boarding, etc.)
+  const serviceCost = useMemo(() => {
+    return ancillaries
+      .filter((a) => a.type !== 'EXTRA_BAG')
+      .reduce((sum, a) => sum + a.price, 0);
+  }, [ancillaries]);
+
+  const grandTotal = basePrice + seatTotalCost + bagCost + serviceCost;
+
+  // Payment fee
+  const paymentFee = useMemo(() => {
+    if (paymentMethod === 'twint') return (grandTotal * 1.6) / 100;
+    return 0;
+  }, [paymentMethod, grandTotal]);
+
+  const finalTotal = grandTotal + paymentFee;
+
+  // Fare rules from pricing result
+  const fareRules: FareRuleGroup[] = useMemo(() => {
+    if (!pricingResult) return [];
+    // If pricingResult has ancillaryOptions, build some basic fare rules
+    return [];
+  }, [pricingResult]);
+
+  // Passenger count labels
+  const travelerCounts = useMemo(() => {
+    const adults = travelers.filter((t) => t.type === 'ADULT').length;
+    const children = travelers.filter((t) => t.type === 'CHILD').length;
+    const infants = travelers.filter((t) => t.type === 'INFANT').length;
+    const parts: string[] = [];
+    if (adults > 0) parts.push(`${adults}× Erw.`);
+    if (children > 0) parts.push(`${children}× Kind`);
+    if (infants > 0) parts.push(`${infants}× Baby`);
+    return parts.join(', ');
+  }, [travelers]);
+
+  // Can submit?
+  const canSubmit = agbAccepted && stornoAccepted && paymentMethod !== null && !isSubmitting;
+
+  // Handle booking
+  const handleSubmit = async () => {
+    if (!canSubmit || !paymentMethod) return;
+    setIsSubmitting(true);
+
+    // Store payment method
+    setPayment(paymentMethod);
+
+    // Phase 5 placeholder: redirect to Saferpay
+    setTimeout(() => {
+      setIsSubmitting(false);
+      alert('Zahlung wird in Phase 5 implementiert (Saferpay-Integration)');
+      // For now, advance to step 4 placeholder
+      setStep(4 as any);
+    }, 1500);
+  };
 
   if (!offer) return null;
-
-  const totalPrice = parseFloat(offer.price.grandTotal) + seatTotalCost;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -35,118 +127,348 @@ export function StepPayment() {
       </div>
 
       <div className="mx-auto max-w-[900px] px-4 py-6 space-y-6">
-        {/* Booking Summary */}
+        {/* ======== Buchungsübersicht ======== */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                Buchungsübersicht
-              </h2>
-            </div>
-            <div className="p-5 space-y-4">
-              {/* Passengers */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                  Passagiere
-                </p>
-                {travelers.map((t, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-1.5 text-sm">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-400">
-                      {idx + 1}
-                    </div>
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t.gender === 'MALE' ? 'Herr' : 'Frau'} {t.firstName} {t.lastName}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      ({t.type === 'ADULT' ? 'Erwachsener' : t.type === 'CHILD' ? 'Kind' : 'Baby'})
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Price */}
-              <div className="border-t-2 border-gray-900 dark:border-gray-200 pt-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">Gesamtpreis</span>
-                  <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    {formatCurrency(totalPrice, offer.price.currency)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <BookingReview
+            offer={offer}
+            travelers={travelers}
+            seatSelections={seatSelections}
+          />
         </motion.section>
 
-        {/* Payment Placeholder */}
+        {/* ======== Preisaufstellung ======== */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+        >
+          <DetailedPriceSummary
+            basePrice={basePrice}
+            seatCost={seatTotalCost}
+            bagCost={bagCost}
+            serviceCost={serviceCost}
+            paymentFee={paymentFee}
+            paymentMethodLabel={paymentMethod === 'twint' ? 'TWINT Gebühr' : null}
+            currency={currency}
+            taxes={taxes}
+            travelerCounts={travelerCounts}
+          />
+        </motion.section>
+
+        {/* ======== Tarifbedingungen ======== */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
+          <FareRulesAccordion fareRules={fareRules} />
+        </motion.section>
+
+        {/* ======== Rechtliches / Checkboxen ======== */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+        >
           <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
-              <CreditCard className="h-5 w-5 text-pink-500" />
-              <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                  Zahlungsmethode
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Wähle deine bevorzugte Zahlungsart
-                </p>
-              </div>
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                📋 Rechtliches
+              </h2>
             </div>
-            <div className="p-5">
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <Sparkles className="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Zahlung wird in Phase 4 verfügbar.
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  Saferpay Integration (Kreditkarte, TWINT, Apple Pay, Google Pay)
-                </p>
+            <div className="p-5 space-y-4">
+              {/* AGB */}
+              <div className="flex items-start gap-3 group cursor-pointer">
+                <Checkbox.Root
+                  checked={agbAccepted}
+                  onCheckedChange={(checked) => setAgbAccepted(!!checked)}
+                  className="mt-0.5 h-5 w-5 rounded-md border-2 border-gray-300 dark:border-gray-600 data-[checked]:border-pink-500 data-[checked]:bg-pink-500 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                >
+                  <Checkbox.Indicator>
+                    <Check className="h-3.5 w-3.5 text-white" />
+                  </Checkbox.Indicator>
+                </Checkbox.Root>
+                <span
+                  className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors"
+                  onClick={() => setAgbAccepted(!agbAccepted)}
+                >
+                  Ich akzeptiere die{' '}
+                  <a
+                    href="/agb"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-600 dark:text-pink-400 underline hover:no-underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Allgemeinen Geschäftsbedingungen
+                  </a>{' '}
+                  und die{' '}
+                  <a
+                    href="/datenschutz"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-600 dark:text-pink-400 underline hover:no-underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Datenschutzerklärung
+                  </a>
+                  .
+                </span>
+              </div>
+
+              {/* Stornobedingungen */}
+              <div className="flex items-start gap-3 group cursor-pointer">
+                <Checkbox.Root
+                  checked={stornoAccepted}
+                  onCheckedChange={(checked) => setStornoAccepted(!!checked)}
+                  className="mt-0.5 h-5 w-5 rounded-md border-2 border-gray-300 dark:border-gray-600 data-[checked]:border-pink-500 data-[checked]:bg-pink-500 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                >
+                  <Checkbox.Indicator>
+                    <Check className="h-3.5 w-3.5 text-white" />
+                  </Checkbox.Indicator>
+                </Checkbox.Root>
+                <span
+                  className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors"
+                  onClick={() => setStornoAccepted(!stornoAccepted)}
+                >
+                  Ich habe die{' '}
+                  <span className="font-medium">Storno- und Umbuchungsbedingungen</span>{' '}
+                  gelesen und akzeptiere diese.
+                </span>
               </div>
             </div>
           </div>
         </motion.section>
 
-        {/* Submit Button (disabled) */}
-        <motion.div
+        {/* ======== Zahlungsmethode ======== */}
+        <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
         >
+          <PaymentMethods
+            selected={paymentMethod}
+            onSelect={setPaymentMethod}
+            totalAmount={grandTotal}
+            currency={currency}
+          />
+        </motion.section>
+
+        {/* ======== Trust Badges ======== */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.25 }}
+        >
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+            <div className="px-5 py-4">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+                <TrustBadge icon="🔒" label="SSL-verschlüsselt" />
+                <TrustBadge icon="✈️" label="IATA-zertifiziert" />
+                <TrustBadge icon="💳" label="PCI DSS konform" />
+                <TrustBadge icon="🇨🇭" label="Schweizer Unternehmen" />
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* ======== Verbindlich buchen ======== */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+        >
+          {/* Validation hints */}
+          <AnimatePresence>
+            {(!agbAccepted || !stornoAccepted || !paymentMethod) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-3"
+              >
+                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 px-4 py-2.5">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    {!paymentMethod
+                      ? '💳 Bitte wähle eine Zahlungsmethode.'
+                      : !agbAccepted
+                        ? '📋 Bitte akzeptiere die AGB und Datenschutzerklärung.'
+                        : '📋 Bitte bestätige die Storno- und Umbuchungsbedingungen.'}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Submit button */}
           <button
             type="button"
-            disabled
-            className="w-full bg-gray-300 text-gray-500 h-14 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 cursor-not-allowed"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className={`
+              w-full h-14 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2
+              ${
+                canSubmit
+                  ? 'bg-pink-500 hover:bg-pink-600 text-white shadow-lg shadow-pink-500/20 cursor-pointer'
+                  : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              }
+            `}
           >
-            <Lock className="h-4 w-4" />
-            Verbindlich buchen · {formatCurrency(totalPrice, offer.price.currency)}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Zahlung wird verarbeitet…
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4" />
+                Verbindlich buchen · {formatCurrency(finalTotal, currency)}
+              </>
+            )}
           </button>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2">
-            Kostenpflichtig — Zahlung wird in Phase 4 implementiert
+
+          {/* Legal notice */}
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center mt-3 max-w-md mx-auto leading-relaxed">
+            Mit Klick auf &quot;Verbindlich buchen&quot; bestätigst du einen kostenpflichtigen
+            Kaufvertrag über{' '}
+            <span className="font-medium text-gray-500 dark:text-gray-400">
+              {formatCurrency(finalTotal, currency)}
+            </span>
+            .
           </p>
 
-          {/* Trust badges */}
-          <div className="flex flex-wrap items-center justify-center gap-4 py-4">
+          {/* Trust badges row */}
+          <div className="flex flex-wrap items-center justify-center gap-4 py-4 mt-2">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <span className="text-emerald-600">🔒</span>
-              <span>SSL-verschlüsselt</span>
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Sicher bezahlen</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <span className="text-emerald-600">✈️</span>
-              <span>IATA-zertifiziert</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <span className="text-emerald-600">💳</span>
-              <span>Sichere Zahlung</span>
+              <span>Sofortige Buchungsbestätigung</span>
             </div>
           </div>
         </motion.div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// TrustBadge
+// ============================================================================
+
+function TrustBadge({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <span className="text-base">{icon}</span>
+      <span className="text-xs font-medium">{label}</span>
+    </div>
+  );
+}
+
+// ============================================================================
+// DetailedPriceSummary — Extended version for step 3
+// ============================================================================
+
+function DetailedPriceSummary({
+  basePrice,
+  seatCost,
+  bagCost,
+  serviceCost,
+  paymentFee,
+  paymentMethodLabel,
+  currency,
+  taxes,
+  travelerCounts,
+}: {
+  basePrice: number;
+  seatCost: number;
+  bagCost: number;
+  serviceCost: number;
+  paymentFee: number;
+  paymentMethodLabel: string | null;
+  currency: string;
+  taxes: number;
+  travelerCounts: string;
+}) {
+  const totalExtras = seatCost + bagCost + serviceCost + paymentFee;
+  const grandTotal = basePrice + totalExtras;
+
+  const lineItems: { label: string; emoji: string; amount: number; show: boolean }[] = [
+    { label: `Flugpreis (${travelerCounts})`, emoji: '✈️', amount: basePrice, show: true },
+    { label: 'Sitzplätze', emoji: '💺', amount: seatCost, show: seatCost > 0 },
+    { label: 'Zusatzgepäck', emoji: '🧳', amount: bagCost, show: bagCost > 0 },
+    { label: 'Services', emoji: '⚡', amount: serviceCost, show: serviceCost > 0 },
+    {
+      label: paymentMethodLabel || 'Zahlungsgebühr',
+      emoji: '💳',
+      amount: paymentFee,
+      show: paymentFee > 0,
+    },
+  ];
+
+  const visibleItems = lineItems.filter((item) => item.show);
+
+  return (
+    <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
+          Preisaufstellung
+        </h2>
+      </div>
+      <div className="px-5 py-4 space-y-2.5">
+        {/* Line items */}
+        <AnimatePresence mode="popLayout">
+          {visibleItems.map((item) => (
+            <motion.div
+              key={item.label}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center justify-between"
+            >
+              <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <span className="text-xs">{item.emoji}</span>
+                {item.label}
+              </span>
+              <span className="text-sm text-gray-900 dark:text-gray-100 tabular-nums font-medium">
+                {formatCurrency(item.amount, currency)}
+              </span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Divider */}
+        <div className="border-t-2 border-gray-900 dark:border-gray-200 pt-2" />
+
+        {/* Total */}
+        <div className="flex items-center justify-between">
+          <span className="text-base font-bold text-gray-900 dark:text-gray-100">
+            Gesamtpreis
+          </span>
+          <motion.span
+            key={grandTotal}
+            initial={{ scale: 1.05 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums"
+          >
+            {formatCurrency(grandTotal, currency)}
+          </motion.span>
+        </div>
+
+        {/* Tax hint */}
+        {taxes > 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Inkl. {formatCurrency(taxes, currency)} Steuern & Gebühren
+          </p>
+        )}
       </div>
     </div>
   );
