@@ -147,7 +147,7 @@ function MonthGrid({
   const effectiveTo = selectedTo || (isRange && selectedFrom && hoverDate && !isBeforeDay(hoverDate, selectedFrom) ? hoverDate : undefined);
 
   const getPriceColor = (price: number) => {
-    if (maxPrice === minPrice) return 'text-gray-400';
+    if (maxPrice === minPrice) return 'text-gray-400 dark:text-gray-500';
     const ratio = (price - minPrice) / (maxPrice - minPrice);
     if (ratio < 0.33) return 'text-emerald-600';
     if (ratio < 0.66) return 'text-amber-600';
@@ -158,7 +158,7 @@ function MonthGrid({
     <div className={cn('select-none', isMobile ? 'px-4' : '')}>
       {/* Month header */}
       <div className="mb-3">
-        <h3 className="text-base font-bold text-gray-800">
+        <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">
           {MONTHS[month]} {year}
         </h3>
       </div>
@@ -166,7 +166,7 @@ function MonthGrid({
       {/* Weekday headers */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS.map((wd) => (
-          <div key={wd} className="text-center text-[11px] font-medium text-gray-400 py-1">
+          <div key={wd} className="text-center text-[11px] font-medium text-gray-400 dark:text-gray-500 py-1">
             {wd}
           </div>
         ))}
@@ -217,7 +217,7 @@ function MonthGrid({
               {showRangeBg && !isStartAndEnd && (
                 <div
                   className={cn(
-                    'absolute inset-y-[2px] bg-pink-50',
+                    'absolute inset-y-[2px] bg-pink-50 dark:bg-pink-900/20',
                     isStart ? 'left-1/2 right-0' : isEnd ? 'left-0 right-1/2' : 'inset-x-0',
                     isFirstCol && !isStart && 'rounded-l-full',
                     isLastCol && !isEnd && 'rounded-r-full',
@@ -234,11 +234,11 @@ function MonthGrid({
                   'relative z-10 flex flex-col items-center justify-center rounded-full transition-colors',
                   isMobile ? 'h-[44px] w-[44px]' : 'h-[38px] w-[38px]',
                   // States
-                  disabled && 'text-gray-300 cursor-not-allowed',
-                  !disabled && !isSelected && !inRange && 'text-gray-800 hover:bg-gray-100 cursor-pointer',
-                  inRange && !isSelected && 'text-gray-800',
+                  disabled && 'text-gray-300 dark:text-gray-600 cursor-not-allowed',
+                  !disabled && !isSelected && !inRange && 'text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer',
+                  inRange && !isSelected && 'text-gray-800 dark:text-gray-100',
                   isSelected && 'bg-pink-500 text-white shadow-sm',
-                  today && !isSelected && 'ring-1.5 ring-gray-800 ring-inset',
+                  today && !isSelected && 'ring-1.5 ring-gray-800 dark:ring-gray-300 ring-inset',
                 )}
               >
                 <span className={cn('text-sm leading-none', isSelected ? 'font-semibold' : 'font-medium')}>
@@ -519,7 +519,7 @@ export function FlightDatePicker({
                 minDate={effectiveMinDate}
               />
             </div>
-            <div className="w-px bg-gray-100 self-stretch my-2" />
+            <div className="w-px bg-gray-100 dark:bg-gray-700 self-stretch my-2" />
             <div className="flex-1 min-w-[280px]">
               <MonthGrid
                 year={rightMonth.getFullYear()}
@@ -562,21 +562,21 @@ export function FlightDatePicker({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 top-0 z-[9999] flex flex-col bg-white rounded-t-2xl"
+            className="fixed inset-x-0 bottom-0 top-0 z-[9999] flex flex-col bg-white dark:bg-gray-900 rounded-t-2xl"
             style={{ maxHeight: '100dvh' }}
           >
             {/* Sticky Header */}
-            <div className="flex-shrink-0 border-b border-gray-100">
+            <div className="flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
               {/* Close + Title */}
               <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors -ml-2"
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors -ml-2"
                 >
-                  <X className="h-5 w-5 text-gray-600" />
+                  <X className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                 </button>
-                <span className="text-sm font-semibold text-gray-800">Reisedaten</span>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Reisedaten</span>
                 <button
                   type="button"
                   onClick={handleReset}
@@ -588,15 +588,15 @@ export function FlightDatePicker({
 
               {/* Tab selector */}
               {isRange && (
-                <div className="flex mx-4 mb-3 bg-gray-100 rounded-xl p-1">
+                <div className="flex mx-4 mb-3 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                   <button
                     type="button"
                     onClick={() => setActiveTab('departure')}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all',
                       activeTab === 'departure'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500',
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400',
                     )}
                   >
                     <Calendar className="h-4 w-4" />
@@ -608,8 +608,8 @@ export function FlightDatePicker({
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all',
                       activeTab === 'return'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500',
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400',
                     )}
                   >
                     <span>{tempTo ? formatShortDate(tempTo) : 'Rückflug'}</span>
@@ -620,7 +620,7 @@ export function FlightDatePicker({
               {/* Weekday header — sticky for scroll */}
               <div className="grid grid-cols-7 px-4 pb-2">
                 {WEEKDAYS.map((wd) => (
-                  <div key={wd} className="text-center text-[11px] font-medium text-gray-400">
+                  <div key={wd} className="text-center text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     {wd}
                   </div>
                 ))}
@@ -631,7 +631,7 @@ export function FlightDatePicker({
             {renderCalendarBody()}
 
             {/* Sticky Footer */}
-            <div className="flex-shrink-0 border-t border-gray-100 px-4 py-3 bg-white safe-area-pb">
+            <div className="flex-shrink-0 border-t border-gray-100 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900 safe-area-pb">
               <button
                 type="button"
                 onClick={handleDone}
@@ -640,7 +640,7 @@ export function FlightDatePicker({
                   'w-full py-3.5 rounded-2xl text-base font-semibold transition-all',
                   canComplete
                     ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',
                 )}
               >
                 {canComplete
@@ -674,7 +674,7 @@ export function FlightDatePicker({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-full z-[9999] mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+            className="absolute left-0 top-full z-[9999] mt-2 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
             style={{ minWidth: 620 }}
           >
             {/* Header with tabs + navigation */}
@@ -682,15 +682,15 @@ export function FlightDatePicker({
               {/* Left: Tab selector */}
               <div className="flex items-center gap-3">
                 {isRange && (
-                  <div className="flex bg-gray-100 rounded-xl p-1">
+                  <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                     <button
                       type="button"
                       onClick={() => setActiveTab('departure')}
                       className={cn(
                         'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                         activeTab === 'departure'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700',
+                          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
                       )}
                     >
                       <Calendar className="h-4 w-4" />
@@ -702,8 +702,8 @@ export function FlightDatePicker({
                       className={cn(
                         'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                         activeTab === 'return'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700',
+                          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
                       )}
                     >
                       <span>{tempTo ? formatShortDate(tempTo) : 'Rückflug'}</span>
@@ -718,16 +718,16 @@ export function FlightDatePicker({
                 <button
                   type="button"
                   onClick={() => navigateMonth(-1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <ChevronLeft className="h-5 w-5 text-gray-500" />
+                  <ChevronLeft className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
                 <button
                   type="button"
                   onClick={() => navigateMonth(1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                  <ChevronRight className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -736,11 +736,11 @@ export function FlightDatePicker({
             {renderCalendarBody()}
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors"
               >
                 Zurücksetzen
               </button>
@@ -752,7 +752,7 @@ export function FlightDatePicker({
                   'px-8 py-2.5 rounded-full text-sm font-semibold transition-all',
                   canComplete
                     ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 hover:shadow-lg active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',
                 )}
               >
                 Fertig
@@ -774,18 +774,18 @@ export function FlightDatePicker({
           'flex w-full items-center gap-2 text-left text-sm transition-all duration-200 cursor-pointer min-h-[48px]',
           compact
             ? 'rounded-xl border-0 bg-white/80 px-4 py-3 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-            : 'rounded-xl border bg-white px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
+            : 'rounded-xl border bg-white dark:bg-gray-900 px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 dark:border-gray-700',
           'focus:outline-none',
         )}
       >
-        <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
-        <span className={cn('whitespace-nowrap font-medium', !value?.from && 'text-gray-400 font-normal')}>
+        <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-500 shrink-0" />
+        <span className={cn('whitespace-nowrap font-medium dark:text-gray-100', !value?.from && 'text-gray-400 dark:text-gray-500 font-normal')}>
           {value?.from ? formatShortDate(value.from) : 'Hinflug'}
         </span>
         {isRange && (
           <>
-            <span className="text-gray-300">→</span>
-            <span className={cn('whitespace-nowrap font-medium', !value?.to && 'text-gray-400 font-normal')}>
+            <span className="text-gray-300 dark:text-gray-600">→</span>
+            <span className={cn('whitespace-nowrap font-medium dark:text-gray-100', !value?.to && 'text-gray-400 dark:text-gray-500 font-normal')}>
               {value?.to ? formatShortDate(value.to) : 'Rückflug'}
             </span>
           </>
@@ -926,27 +926,27 @@ export function SingleFlightDatePicker({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 top-0 z-[9999] flex flex-col bg-white rounded-t-2xl"
+            className="fixed inset-x-0 bottom-0 top-0 z-[9999] flex flex-col bg-white dark:bg-gray-900 rounded-t-2xl"
             style={{ maxHeight: '100dvh' }}
           >
             {/* Header */}
-            <div className="flex-shrink-0 border-b border-gray-100">
+            <div className="flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
               <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors -ml-2"
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors -ml-2"
                 >
-                  <X className="h-5 w-5 text-gray-600" />
+                  <X className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                 </button>
-                <span className="text-sm font-semibold text-gray-800">{label || placeholder}</span>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{label || placeholder}</span>
                 <div className="w-10" />
               </div>
 
               {/* Show current selection */}
               {tempDate && (
                 <div className="flex items-center justify-center pb-3">
-                  <div className="flex items-center gap-2 bg-pink-50 text-pink-600 rounded-full px-4 py-1.5 text-sm font-medium">
+                  <div className="flex items-center gap-2 bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-full px-4 py-1.5 text-sm font-medium">
                     <Calendar className="h-4 w-4" />
                     {formatShortDate(tempDate)}
                   </div>
@@ -956,7 +956,7 @@ export function SingleFlightDatePicker({
               {/* Weekday header */}
               <div className="grid grid-cols-7 px-4 pb-2">
                 {WEEKDAYS.map((wd) => (
-                  <div key={wd} className="text-center text-[11px] font-medium text-gray-400">
+                  <div key={wd} className="text-center text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     {wd}
                   </div>
                 ))}
@@ -986,7 +986,7 @@ export function SingleFlightDatePicker({
             </div>
 
             {/* Footer */}
-            <div className="flex-shrink-0 border-t border-gray-100 px-4 py-3 bg-white safe-area-pb">
+            <div className="flex-shrink-0 border-t border-gray-100 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900 safe-area-pb">
               <button
                 type="button"
                 onClick={handleDone}
@@ -995,7 +995,7 @@ export function SingleFlightDatePicker({
                   'w-full py-3.5 rounded-2xl text-base font-semibold transition-all',
                   tempDate
                     ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',
                 )}
               >
                 {tempDate ? `${formatShortDate(tempDate)} — Fertig` : 'Datum wählen'}
@@ -1025,14 +1025,14 @@ export function SingleFlightDatePicker({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-full z-[9999] mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+            className="absolute left-0 top-full z-[9999] mt-2 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
             style={{ minWidth: 620 }}
           >
             {/* Header with navigation */}
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">
+                <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {tempDate ? formatShortDate(tempDate) : placeholder}
                 </span>
               </div>
@@ -1040,16 +1040,16 @@ export function SingleFlightDatePicker({
                 <button
                   type="button"
                   onClick={() => navigateMonth(-1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <ChevronLeft className="h-5 w-5 text-gray-500" />
+                  <ChevronLeft className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
                 <button
                   type="button"
                   onClick={() => navigateMonth(1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                  <ChevronRight className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -1078,7 +1078,7 @@ export function SingleFlightDatePicker({
                       minDate={effectiveMinDate}
                     />
                   </div>
-                  <div className="w-px bg-gray-100 self-stretch my-2" />
+                  <div className="w-px bg-gray-100 dark:bg-gray-700 self-stretch my-2" />
                   <div className="flex-1 min-w-[280px]">
                     <MonthGrid
                       year={rightMonth.getFullYear()}
@@ -1097,11 +1097,11 @@ export function SingleFlightDatePicker({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => setTempDate(undefined)}
-                className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors"
               >
                 Zurücksetzen
               </button>
@@ -1113,7 +1113,7 @@ export function SingleFlightDatePicker({
                   'px-8 py-2.5 rounded-full text-sm font-semibold transition-all',
                   tempDate
                     ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 hover:shadow-lg active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',
                 )}
               >
                 Fertig
@@ -1134,13 +1134,13 @@ export function SingleFlightDatePicker({
           'flex w-full items-center gap-2 text-left text-sm transition-all duration-200 cursor-pointer min-h-[48px]',
           compact
             ? 'rounded-xl border-0 bg-white/80 py-3.5 px-4 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-            : 'rounded-xl border bg-white px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
+            : 'rounded-xl border bg-white dark:bg-gray-900 px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 dark:border-gray-700',
           'focus:outline-none',
-          !value && 'text-gray-400',
+          !value && 'text-gray-400 dark:text-gray-500',
         )}
       >
-        <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
-        <span className="font-medium text-gray-800">{value ? formatShortDate(value) : placeholder}</span>
+        <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-500 shrink-0" />
+        <span className="font-medium text-gray-800 dark:text-gray-100">{value ? formatShortDate(value) : placeholder}</span>
       </button>
 
       {mounted && (isMobile ? createPortal(mobileSheet, document.body) : desktopDropdown)}
