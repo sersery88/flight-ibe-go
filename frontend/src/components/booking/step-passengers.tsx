@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -267,6 +268,28 @@ export function StepPassengers() {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // ---- Price Change Dialog State ----
+  const [priceChangeDialog, setPriceChangeDialog] = useState<{
+    originalPrice: number;
+    newPrice: number;
+    currency: string;
+    onAccept: () => void;
+    onDecline: () => void;
+  } | null>(null);
+
+  // ---- Network Error / Offer Expired State ----
+  const [offerExpired, setOfferExpired] = useState(false);
+
+  // ---- Scroll to first error on validation failure ----
+  const scrollToFirstError = useCallback(() => {
+    setTimeout(() => {
+      const firstError = document.querySelector('[aria-invalid="true"], .text-red-500');
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }, []);
+
   // ---- Submit ----
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
@@ -318,24 +341,58 @@ export function StepPassengers() {
           contact,
         });
         setOrder(orderResult.orderId, orderResult.pnrReference);
+
+        // Check for price change (if the API response includes pricing data)
+        const resultAny = orderResult as unknown as Record<string, unknown>;
+        if (resultAny.pricedTotal && offer) {
+          const originalPrice = parseFloat(offer.price.grandTotal);
+          const newPrice = parseFloat(String(resultAny.pricedTotal));
+          if (Math.abs(newPrice - originalPrice) > 0.01) {
+            // Show price change dialog
+            return new Promise<void>((resolve) => {
+              setPriceChangeDialog({
+                originalPrice,
+                newPrice,
+                currency: offer.price.currency,
+                onAccept: () => {
+                  setPriceChangeDialog(null);
+                  setIsSubmitting(false);
+                  setStep(2);
+                  resolve();
+                },
+                onDecline: () => {
+                  setPriceChangeDialog(null);
+                  setIsSubmitting(false);
+                  resolve();
+                },
+              });
+            });
+          }
+        }
       } catch (apiError: any) {
-        // PNR creation failed — still allow proceeding (graceful degradation)
-        // The error may be due to test API limitations
+        // PNR creation failed — handle specific errors
         console.warn('PNR creation failed, proceeding without order:', apiError);
-        // If the error indicates offer expired, show specific message
+
         if (apiError?.status === 400 || apiError?.code === 'OFFER_EXPIRED') {
+          setOfferExpired(true);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Network error
+        if (apiError?.message?.includes('fetch') || apiError?.message?.includes('network') || !navigator.onLine) {
           setSubmitError(
-            'Das Angebot ist abgelaufen. Bitte suche erneut nach Flügen.'
+            'Verbindungsfehler. Bitte prüfe deine Internetverbindung und versuche es erneut.'
           );
           setIsSubmitting(false);
           return;
         }
+
         // For other errors, proceed anyway (test environment tolerance)
       }
 
       // 3. Advance to step 2
       setStep(2);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setSubmitError(
         err?.message || 'Buchung konnte nicht erstellt werden. Bitte versuche es erneut.'
@@ -345,6 +402,12 @@ export function StepPassengers() {
     }
   };
 
+  const onInvalid = useCallback(() => {
+    scrollToFirstError();
+  }, [scrollToFirstError]);
+
+  const router = useRouter();
+
   if (!offer) return null;
 
   const outbound = offer.itineraries[0];
@@ -352,6 +415,134 @@ export function StepPassengers() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* ---- PNR Creation Overlay ---- */}
+      <AnimatePresence>
+        {isSubmitting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            aria-live="assertive"
+            role="alert"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl text-center max-w-sm mx-4"
+            >
+              <motion.div
+                animate={{ x: [0, 60, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="text-4xl mb-4"
+              >
+                ✈️
+              </motion.div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                PNR wird erstellt…
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Bitte warte einen Moment
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-pink-500" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- Offer Expired Overlay ---- */}
+      <AnimatePresence>
+        {offerExpired && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Angebot abgelaufen"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl text-center max-w-sm mx-4"
+            >
+              <div className="text-4xl mb-4">😔</div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Angebot nicht mehr verfügbar
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Dieses Angebot ist leider nicht mehr verfügbar. Preise und Verfügbarkeit können sich jederzeit ändern.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white h-12 rounded-xl text-sm font-semibold shadow-lg shadow-pink-500/20 transition-all"
+              >
+                Neue Suche starten
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- Price Change Dialog ---- */}
+      <AnimatePresence>
+        {priceChangeDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Preisänderung"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl text-center max-w-sm mx-4"
+            >
+              <div className="text-4xl mb-4">💰</div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Der Preis hat sich geändert
+              </h3>
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <span className="text-gray-400 line-through text-base">
+                  {formatCurrency(priceChangeDialog.originalPrice, priceChangeDialog.currency)}
+                </span>
+                <span className="text-lg">→</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(priceChangeDialog.newPrice, priceChangeDialog.currency)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Möchtest du zum neuen Preis fortfahren?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={priceChangeDialog.onDecline}
+                  className="flex-1 h-12 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={priceChangeDialog.onAccept}
+                  className="flex-1 bg-pink-500 hover:bg-pink-600 text-white h-12 rounded-xl text-sm font-semibold shadow-lg shadow-pink-500/20 transition-all"
+                >
+                  Akzeptieren
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top bar */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="mx-auto max-w-[900px] px-4 py-3 flex items-center">
@@ -365,7 +556,7 @@ export function StepPassengers() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate>
         <div className="mx-auto max-w-[900px] px-4 py-6 space-y-6">
           {/* ---- Flight Summary (collapsible) ---- */}
           <motion.section
@@ -582,8 +773,9 @@ export function StepPassengers() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
+            className="pb-[env(safe-area-inset-bottom,0px)]"
           >
-            {/* Error banner */}
+            {/* Error banner with retry */}
             <AnimatePresence>
               {submitError && (
                 <motion.div
@@ -591,19 +783,30 @@ export function StepPassengers() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   className="mb-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 px-4 py-3 flex items-start gap-3"
+                  role="alert"
                 >
                   <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-red-700 dark:text-red-300">
                       {submitError}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setSubmitError(null)}
-                      className="text-xs text-red-600 dark:text-red-400 underline mt-1"
-                    >
-                      Schließen
-                    </button>
+                    <div className="flex gap-3 mt-2">
+                      {submitError.includes('Verbindung') && (
+                        <button
+                          type="submit"
+                          className="text-xs text-red-600 dark:text-red-400 font-medium underline hover:no-underline"
+                        >
+                          Erneut versuchen
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSubmitError(null)}
+                        className="text-xs text-red-600 dark:text-red-400 underline hover:no-underline"
+                      >
+                        Schließen
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -612,7 +815,8 @@ export function StepPassengers() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:text-gray-500 text-white h-14 rounded-xl text-base font-semibold shadow-lg shadow-pink-500/20 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+              className="w-full bg-pink-500 hover:bg-pink-600 active:bg-pink-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 text-white h-14 rounded-xl text-base font-semibold shadow-lg shadow-pink-500/20 disabled:shadow-none transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-pink-500 focus-visible:outline-offset-2"
+              aria-label={`Weiter zu Extras, ${formatCurrency(offer.price.grandTotal, offer.price.currency)}`}
             >
               {isSubmitting ? (
                 <>
@@ -629,19 +833,23 @@ export function StepPassengers() {
               )}
             </button>
 
-            {/* Trust badges */}
-            <div className="flex flex-wrap items-center justify-center gap-4 py-4">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {/* Trust badges — 2×2 grid on mobile, row on desktop */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 sm:gap-4 py-4">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                 <span className="text-emerald-600">🔒</span>
                 <span>SSL-verschlüsselt</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                 <span className="text-emerald-600">✈️</span>
                 <span>IATA-zertifiziert</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                 <span className="text-emerald-600">💳</span>
                 <span>Sichere Zahlung</span>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-emerald-600">🇨🇭</span>
+                <span>Schweizer Firma</span>
               </div>
             </div>
           </motion.div>
@@ -919,12 +1127,14 @@ function PassengerCard({
                       type="text"
                       autoComplete="given-name"
                       placeholder="Wie im Reisepass"
+                      aria-invalid={!!travelerErrors?.firstName}
+                      aria-describedby={travelerErrors?.firstName ? `t${index}-fn-err` : undefined}
                       {...register(`travelers.${index}.firstName`)}
                       className={inputClass(!!travelerErrors?.firstName)}
                     />
                   </motion.div>
                   {travelerErrors?.firstName && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 pt-0.5 mt-1">
+                    <p id={`t${index}-fn-err`} className="text-xs text-red-500 flex items-center gap-1 pt-0.5 mt-1" role="alert">
                       <AlertCircle className="h-3 w-3 shrink-0" />
                       {travelerErrors.firstName.message}
                     </p>
@@ -942,12 +1152,14 @@ function PassengerCard({
                       type="text"
                       autoComplete="family-name"
                       placeholder="Wie im Reisepass"
+                      aria-invalid={!!travelerErrors?.lastName}
+                      aria-describedby={travelerErrors?.lastName ? `t${index}-ln-err` : undefined}
                       {...register(`travelers.${index}.lastName`)}
                       className={inputClass(!!travelerErrors?.lastName)}
                     />
                   </motion.div>
                   {travelerErrors?.lastName && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 pt-0.5 mt-1">
+                    <p id={`t${index}-ln-err`} className="text-xs text-red-500 flex items-center gap-1 pt-0.5 mt-1" role="alert">
                       <AlertCircle className="h-3 w-3 shrink-0" />
                       {travelerErrors.lastName.message}
                     </p>

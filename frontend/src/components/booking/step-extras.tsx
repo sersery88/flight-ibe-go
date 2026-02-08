@@ -28,17 +28,19 @@ import type { FlightOffer } from '@/types/flight';
 
 function SkeletonCard({ lines = 3 }: { lines?: number }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden animate-pulse">
+    <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
-        <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         <div className="space-y-1.5 flex-1">
-          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
-          <div className="h-3 w-48 bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-3 w-48 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
         </div>
       </div>
       <div className="p-5 space-y-3">
         {Array.from({ length: lines }).map((_, i) => (
-          <div key={i} className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+          <div key={i} className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl relative overflow-hidden">
+            <div className="absolute inset-0 animate-shimmer" />
+          </div>
         ))}
       </div>
     </div>
@@ -284,7 +286,6 @@ export function StepExtras() {
 
     setAncillaries(ancillaries);
     setStep(3);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [bagSelections, serviceSelections, bagOptions, serviceOptions, setAncillaries, setStep]);
 
   if (!offer) return null;
@@ -545,19 +546,23 @@ export function StepExtras() {
             </span>
           </button>
 
-          {/* Trust badges */}
-          <div className="flex flex-wrap items-center justify-center gap-4 py-4">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          {/* Trust badges — 2×2 grid on mobile */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 sm:gap-4 py-4 pb-[env(safe-area-inset-bottom,0px)]">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <span className="text-emerald-600">🔒</span>
               <span>SSL-verschlüsselt</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <span className="text-emerald-600">✈️</span>
               <span>IATA-zertifiziert</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <span className="text-emerald-600">💳</span>
               <span>Sichere Zahlung</span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-emerald-600">🇨🇭</span>
+              <span>Schweizer Firma</span>
             </div>
           </div>
         </motion.div>

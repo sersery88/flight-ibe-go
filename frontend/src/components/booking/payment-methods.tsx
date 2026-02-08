@@ -135,8 +135,10 @@ export function PaymentMethods({ selected, onSelect, totalAmount, currency }: Pa
             <motion.label
               key={method.id}
               whileTap={{ scale: 0.99 }}
+              layout
               className={`
-                relative flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all min-h-[60px]
+                relative flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer min-h-[60px]
+                transition-[background-color,border-color] duration-200 ease-in-out
                 ${
                   isSelected
                     ? 'border-pink-500 bg-pink-50/50 dark:bg-pink-950/20'

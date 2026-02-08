@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Plane } from 'lucide-react';
 import Link from 'next/link';
 import { useBookingFlowStore } from '@/stores/booking-flow-store';
@@ -17,11 +17,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
 // ============================================================================
-// Booking Page — 4-Step Router
+// Booking Page — 4-Step Router with Polish (Phase 6)
 // ============================================================================
 
 function BookingContent() {
   const { currentStep, offer, orderId, setStep, setOffer } = useBookingFlowStore();
+  const prefersReducedMotion = useReducedMotion();
+
+  // Track direction for slide animation
+  const [prevStep, setPrevStep] = useState(currentStep);
+  const slideDirection = currentStep >= prevStep ? 1 : -1;
+
+  useEffect(() => {
+    setPrevStep(currentStep);
+  }, [currentStep]);
 
   // Legacy: import offer from old booking store or search store if not in flow store yet
   const legacyOffer = useBookingStore((s) => s.selectedOffer);
@@ -52,6 +61,20 @@ function BookingContent() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
+
+  // Scroll to top on step change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'instant' : 'smooth' });
+  }, [currentStep, prefersReducedMotion]);
+
+  // Screen reader announcement on step change
+  useEffect(() => {
+    const stepLabels = ['', 'Passagierdaten', 'Extras & Sitzplatz', 'Zahlung', 'Bestätigung'];
+    const announcement = document.getElementById('step-announcement');
+    if (announcement) {
+      announcement.textContent = `Schritt ${currentStep} von 4: ${stepLabels[currentStep]}`;
+    }
+  }, [currentStep]);
 
   // No offer → redirect to search
   if (!offer && !legacyOffer && !searchOffer) {
@@ -96,11 +119,23 @@ function BookingContent() {
 
   const handleStepClick = (step: 1 | 2 | 3 | 4) => {
     setStep(step);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Animation variants respecting reduced motion
+  const animDuration = prefersReducedMotion ? 0 : 0.25;
+  const slideX = prefersReducedMotion ? 0 : 20 * slideDirection;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 print:bg-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 print:bg-white scroll-pt-20">
+      {/* Screen reader live region for step announcements */}
+      <div
+        id="step-announcement"
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      />
+
       {/* Progress Bar */}
       <div className="no-print">
         <ProgressBar currentStep={currentStep} onStepClick={handleStepClick} />
@@ -110,10 +145,10 @@ function BookingContent() {
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStep}
-          initial={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, x: slideX }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.25 }}
+          exit={{ opacity: 0, x: -slideX }}
+          transition={{ duration: animDuration, ease: 'easeInOut' }}
         >
           {currentStep === 1 && <StepPassengers />}
           {currentStep === 2 && <StepExtras />}

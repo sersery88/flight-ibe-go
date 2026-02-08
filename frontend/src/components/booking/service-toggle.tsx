@@ -75,8 +75,8 @@ export function ServiceToggle({ service, checked, onChange }: ServiceToggleProps
         {checked && (
           <motion.div
             initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            animate={{ scale: [0, 1.3, 1] }}
+            transition={{ type: 'spring', stiffness: 500, damping: 15 }}
           >
             <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
           </motion.div>

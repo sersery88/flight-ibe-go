@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Check, Users, Armchair, CreditCard, PartyPopper } from 'lucide-react';
 
 // ============================================================================
@@ -31,15 +31,22 @@ const STEPS: StepDef[] = [
 ];
 
 // ============================================================================
-// ProgressBar Component
+// ProgressBar Component — Phase 6 Polish
 // ============================================================================
 
 export function ProgressBar({ currentStep, onStepClick }: ProgressBarProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const animDuration = prefersReducedMotion ? 0 : 0.4;
+
   return (
-    <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+    <nav
+      className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm"
+      aria-label="Buchungsfortschritt"
+      role="navigation"
+    >
       <div className="mx-auto max-w-[1200px] px-4 py-3 md:py-4">
         {/* Desktop */}
-        <div className="hidden md:flex items-center justify-center gap-0">
+        <ol className="hidden md:flex items-center justify-center gap-0 list-none m-0 p-0">
           {STEPS.map((stepDef, idx) => {
             const isCompleted = currentStep > stepDef.step;
             const isCurrent = currentStep === stepDef.step;
@@ -47,32 +54,35 @@ export function ProgressBar({ currentStep, onStepClick }: ProgressBarProps) {
             const isClickable = isCompleted && onStepClick;
 
             return (
-              <div key={stepDef.step} className="flex items-center">
+              <li key={stepDef.step} className="flex items-center">
                 {/* Step indicator */}
                 <button
                   type="button"
                   onClick={() => isClickable && onStepClick(stepDef.step)}
                   disabled={!isClickable}
-                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all ${
+                  aria-label={`Schritt ${stepDef.step}: ${stepDef.label}${isCompleted ? ' (abgeschlossen)' : isCurrent ? ' (aktuell)' : ''}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all focus-visible:outline-2 focus-visible:outline-pink-500 focus-visible:outline-offset-2 ${
                     isClickable ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''
                   } ${!isClickable && !isCurrent ? 'cursor-default' : ''}`}
                 >
                   {/* Circle */}
                   <motion.div
                     layout
-                    className={`flex items-center justify-center rounded-full shrink-0 transition-colors duration-300 ${
+                    className={`flex items-center justify-center rounded-full shrink-0 transition-colors ${
                       isCompleted
                         ? 'h-7 w-7 bg-emerald-500 text-white'
                         : isCurrent
                           ? 'h-7 w-7 bg-pink-500 text-white'
                           : 'h-7 w-7 bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
                     }`}
+                    transition={{ duration: animDuration }}
                   >
                     {isCompleted ? (
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                        transition={prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 20 }}
                       >
                         <Check className="h-4 w-4" strokeWidth={3} />
                       </motion.div>
@@ -95,49 +105,52 @@ export function ProgressBar({ currentStep, onStepClick }: ProgressBarProps) {
                   </span>
                 </button>
 
-                {/* Connector line */}
+                {/* Connector line — flowing fill */}
                 {idx < STEPS.length - 1 && (
                   <div className="w-12 h-[2px] mx-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full bg-emerald-500 rounded-full"
-                      initial={{ width: '0%' }}
+                      className="h-full bg-emerald-500 rounded-full origin-left"
+                      initial={{ scaleX: 0 }}
                       animate={{
-                        width: isCompleted ? '100%' : '0%',
+                        scaleX: isCompleted ? 1 : 0,
                       }}
-                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                      transition={{ duration: animDuration, ease: 'easeInOut' }}
                     />
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
 
-        {/* Mobile */}
-        <div className="flex md:hidden items-center justify-between">
+        {/* Mobile — Icons only, no text labels on very small screens */}
+        <ol className="flex md:hidden items-center justify-between list-none m-0 p-0">
           {STEPS.map((stepDef, idx) => {
             const isCompleted = currentStep > stepDef.step;
             const isCurrent = currentStep === stepDef.step;
             const isClickable = isCompleted && onStepClick;
 
             return (
-              <div key={stepDef.step} className="flex items-center flex-1">
+              <li key={stepDef.step} className="flex items-center flex-1">
                 <button
                   type="button"
                   onClick={() => isClickable && onStepClick(stepDef.step)}
                   disabled={!isClickable}
-                  className="flex flex-col items-center gap-1 flex-1"
+                  aria-label={`Schritt ${stepDef.step}: ${stepDef.label}${isCompleted ? ' (abgeschlossen)' : isCurrent ? ' (aktuell)' : ''}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className="flex flex-col items-center gap-1 flex-1 focus-visible:outline-2 focus-visible:outline-pink-500 focus-visible:outline-offset-2 rounded-lg"
                 >
                   {/* Circle */}
                   <motion.div
                     layout
-                    className={`flex items-center justify-center rounded-full shrink-0 transition-colors duration-300 ${
+                    className={`flex items-center justify-center rounded-full shrink-0 transition-colors ${
                       isCompleted
                         ? 'h-8 w-8 bg-emerald-500 text-white'
                         : isCurrent
                           ? 'h-8 w-8 bg-pink-500 text-white'
                           : 'h-8 w-8 bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
                     }`}
+                    transition={{ duration: animDuration }}
                   >
                     {isCompleted ? (
                       <Check className="h-4 w-4" strokeWidth={3} />
@@ -146,9 +159,9 @@ export function ProgressBar({ currentStep, onStepClick }: ProgressBarProps) {
                     )}
                   </motion.div>
 
-                  {/* Short label */}
+                  {/* Short label — hidden on <400px via min-[400px] */}
                   <span
-                    className={`text-[10px] font-medium transition-colors duration-300 ${
+                    className={`text-[10px] font-medium transition-colors duration-300 hidden min-[400px]:block ${
                       isCompleted
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : isCurrent
@@ -160,24 +173,24 @@ export function ProgressBar({ currentStep, onStepClick }: ProgressBarProps) {
                   </span>
                 </button>
 
-                {/* Connector line */}
+                {/* Connector line — flowing fill */}
                 {idx < STEPS.length - 1 && (
-                  <div className="h-[2px] flex-1 mx-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden -mt-4">
+                  <div className="h-[2px] flex-1 mx-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden -mt-4 min-[400px]:-mt-4">
                     <motion.div
-                      className="h-full bg-emerald-500 rounded-full"
-                      initial={{ width: '0%' }}
+                      className="h-full bg-emerald-500 rounded-full origin-left"
+                      initial={{ scaleX: 0 }}
                       animate={{
-                        width: isCompleted ? '100%' : '0%',
+                        scaleX: isCompleted ? 1 : 0,
                       }}
-                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                      transition={{ duration: animDuration, ease: 'easeInOut' }}
                     />
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       </div>
-    </div>
+    </nav>
   );
 }

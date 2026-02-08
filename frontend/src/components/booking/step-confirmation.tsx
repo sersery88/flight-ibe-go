@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   CheckCircle2,
   Copy,
@@ -30,8 +30,50 @@ import { formatCurrency } from '@/lib/utils';
 // StepConfirmation — Full Implementation (Phase 5)
 // ============================================================================
 
+// ============================================================================
+// Confetti Particles — Subtle celebration effect
+// ============================================================================
+
+const CONFETTI_COLORS = ['#ec4899', '#10b981', '#f59e0b', '#6366f1', '#ef4444', '#14b8a6'];
+
+function ConfettiParticle({ index }: { index: number }) {
+  const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
+  const x = Math.random() * 300 - 150;
+  const rotation = Math.random() * 720 - 360;
+  const size = 4 + Math.random() * 6;
+  const delay = Math.random() * 0.5;
+
+  return (
+    <motion.div
+      initial={{ opacity: 1, y: 0, x: 0, rotate: 0, scale: 1 }}
+      animate={{
+        opacity: 0,
+        y: -(80 + Math.random() * 120),
+        x: x,
+        rotate: rotation,
+        scale: 0.3,
+      }}
+      transition={{ duration: 1.5 + Math.random(), delay, ease: 'easeOut' }}
+      className="absolute pointer-events-none"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: color,
+        borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+        left: '50%',
+        top: '50%',
+      }}
+    />
+  );
+}
+
+// ============================================================================
+// StepConfirmation — Full Implementation (Phase 5 + Phase 6 Polish)
+// ============================================================================
+
 export function StepConfirmation() {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
   const {
     offer,
     travelers,
@@ -42,8 +84,17 @@ export function StepConfirmation() {
   } = useBookingFlowStore();
   const globalSeatSelections = useSeatSelectionStore((s) => s.selections);
   const [copied, setCopied] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(!prefersReducedMotion);
 
   const bookingRef = pnrReference || 'DEMO01';
+
+  // Turn off confetti after animation
+  useEffect(() => {
+    if (showConfetti) {
+      const timer = setTimeout(() => setShowConfetti(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showConfetti]);
 
   // Clear sessionStorage on confirmation — user has paid, flow is done
   useEffect(() => {
@@ -111,12 +162,20 @@ export function StepConfirmation() {
           transition={{ duration: 0.5 }}
         >
           {/* ── Success Header ─────────────────────────────────────── */}
-          <div className="rounded-t-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-6 py-10 text-center text-white shadow-xl print:rounded-none print:shadow-none print:bg-emerald-600">
+          <div className="rounded-t-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-6 py-10 text-center text-white shadow-xl print:rounded-none print:shadow-none print:bg-emerald-600 relative overflow-hidden">
+            {/* Confetti */}
+            {showConfetti && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <ConfettiParticle key={i} index={i} />
+                ))}
+              </div>
+            )}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 15 }}
-              className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm"
+              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.3, type: 'spring', stiffness: 200, damping: 15 }}
+              className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm relative z-10"
             >
               <CheckCircle2 className="h-12 w-12" />
             </motion.div>
@@ -175,16 +234,19 @@ export function StepConfirmation() {
                     )}
                   </button>
                 </div>
-                {copied && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium no-print"
-                  >
-                    ✓ Kopiert!
-                  </motion.p>
-                )}
+                <AnimatePresence>
+                  {copied && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium no-print"
+                    >
+                      ✓ In die Zwischenablage kopiert!
+                    </motion.p>
+                  )}
+                </AnimatePresence>
                 <p className="text-xs text-gray-500 dark:text-gray-400 text-center leading-relaxed">
                   Diesen Code benötigst du für den Online Check-in und am Flughafen.
                 </p>

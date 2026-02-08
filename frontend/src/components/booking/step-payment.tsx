@@ -102,16 +102,53 @@ export function StepPayment() {
     // Phase 5 placeholder: redirect to Saferpay
     setTimeout(() => {
       setIsSubmitting(false);
-      alert('Zahlung wird in Phase 5 implementiert (Saferpay-Integration)');
       // For now, advance to step 4 placeholder
       setStep(4 as any);
-    }, 1500);
+    }, 2000);
   };
 
   if (!offer) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* ---- Payment Processing Overlay ---- */}
+      <AnimatePresence>
+        {isSubmitting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            aria-live="assertive"
+            role="alert"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl text-center max-w-sm mx-4"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                className="text-4xl mb-4 inline-block"
+              >
+                💳
+              </motion.div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Zahlung wird verarbeitet…
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Bitte schließe dieses Fenster nicht
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-pink-500" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top bar */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="mx-auto max-w-[900px] px-4 py-3 flex items-center">
@@ -266,7 +303,7 @@ export function StepPayment() {
         >
           <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
             <div className="px-5 py-4">
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-x-6 gap-y-3">
                 <TrustBadge icon="🔒" label="SSL-verschlüsselt" />
                 <TrustBadge icon="✈️" label="IATA-zertifiziert" />
                 <TrustBadge icon="💳" label="PCI DSS konform" />
@@ -342,7 +379,7 @@ export function StepPayment() {
           </p>
 
           {/* Trust badges row */}
-          <div className="flex flex-wrap items-center justify-center gap-4 py-4 mt-2">
+          <div className="flex flex-wrap items-center justify-center gap-4 py-4 mt-2 pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
               <span>Sicher bezahlen</span>

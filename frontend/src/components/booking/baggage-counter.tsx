@@ -77,10 +77,10 @@ export function BaggageCounter({
               <AnimatePresence mode="popLayout">
                 <motion.span
                   key={qty}
-                  initial={{ y: -8, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 8, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  initial={{ y: -8, opacity: 0, scale: 1.2 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: 8, opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15, type: 'spring', stiffness: 400, damping: 25 }}
                   className="w-8 text-center text-sm font-bold text-gray-900 dark:text-gray-100 tabular-nums"
                 >
                   {qty}
