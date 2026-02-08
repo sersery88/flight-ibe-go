@@ -309,6 +309,17 @@ export interface CreateOrderResponse {
   amadeusData?: unknown;
 }
 
+export interface AncillaryService {
+  type: string;     // BAGGAGE, MEAL, LOUNGE, BRANDED_FARES, PRIORITY_BOARDING, AIRPORT_CHECKIN
+  code?: string;
+  description: string;
+  isChargeable: boolean;
+  price?: number;
+  currency?: string;
+  segmentId?: string;
+  travelerId?: string;
+}
+
 export interface PricingResponse {
   flightOffers: FlightOffer[];
   bagOptions?: Array<{
@@ -341,6 +352,9 @@ export interface PricingResponse {
     amount: number;
     currency: string;
   }>;
+  ancillaryServices?: AncillaryService[];
+  brandedFare?: string;
+  brandedFareLabel?: string;
 }
 
 // Price offers with ancillaries (bags, fare rules, etc.)

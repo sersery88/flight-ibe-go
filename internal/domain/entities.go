@@ -439,13 +439,28 @@ type PricingRequest struct {
 	Include []string      `json:"include"` // bags, other-services, detailed-fare-rules, credit-card-fees
 }
 
+// AncillaryService represents an amenity/service parsed from fare details
+type AncillaryService struct {
+	Type         string  `json:"type"`                   // BAGGAGE, MEAL, LOUNGE, BRANDED_FARES, PRIORITY_BOARDING, AIRPORT_CHECKIN
+	Code         string  `json:"code,omitempty"`
+	Description  string  `json:"description"`
+	IsChargeable bool    `json:"isChargeable"`
+	Price        float64 `json:"price,omitempty"`
+	Currency     string  `json:"currency,omitempty"`
+	SegmentID    string  `json:"segmentId,omitempty"`
+	TravelerID   string  `json:"travelerId,omitempty"`
+}
+
 // PricingResponse is the response from pricing with ancillaries
 type PricingResponse struct {
-	FlightOffers   []FlightOffer   `json:"flightOffers"`
-	BagOptions     []BagOption     `json:"bagOptions,omitempty"`
-	ServiceOptions []ServiceOption `json:"serviceOptions,omitempty"`
-	FareRules      []FareRuleGroup `json:"fareRules,omitempty"`
-	CreditCardFees []CreditCardFee `json:"creditCardFees,omitempty"`
+	FlightOffers      []FlightOffer      `json:"flightOffers"`
+	BagOptions        []BagOption        `json:"bagOptions,omitempty"`
+	ServiceOptions    []ServiceOption    `json:"serviceOptions,omitempty"`
+	FareRules         []FareRuleGroup    `json:"fareRules,omitempty"`
+	CreditCardFees    []CreditCardFee    `json:"creditCardFees,omitempty"`
+	AncillaryServices []AncillaryService `json:"ancillaryServices,omitempty"`
+	BrandedFare       string             `json:"brandedFare,omitempty"`
+	BrandedFareLabel  string             `json:"brandedFareLabel,omitempty"`
 }
 
 // BagOption represents an additional bag that can be purchased

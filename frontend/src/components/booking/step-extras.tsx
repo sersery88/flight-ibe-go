@@ -9,18 +9,181 @@ import {
   Zap,
   Loader2,
   Check,
+  ChevronDown,
+  Info,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useBookingFlowStore, type SelectedAncillary } from '@/stores/booking-flow-store';
 import { useSeatSelectionStore } from '@/stores/seat-selection-store';
 import { SeatmapModal } from '@/components/seatmap';
 import { BaggageCounter, type BagOption } from '@/components/booking/baggage-counter';
-import { ServiceToggle, type ServiceOption } from '@/components/booking/service-toggle';
 import { FareRulesAccordion, type FareRuleGroup } from '@/components/booking/fare-rules-accordion';
 import { PriceSummary } from '@/components/booking/price-summary';
-import { priceOffersWithAncillaries, type PricingResponse } from '@/lib/api-client';
+import { priceOffersWithAncillaries, type PricingResponse, type AncillaryService } from '@/lib/api-client';
 import { formatCurrency, getTravelerTypeLabel } from '@/lib/utils';
 import type { FlightOffer } from '@/types/flight';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface InferredAmenity {
+  type: string; // BAGGAGE, MEAL, LOUNGE, BRANDED_FARES
+  description: string;
+  included: boolean;
+  isChargeable?: boolean;
+  price?: number;
+  currency?: string;
+}
+
+interface CategoryItem {
+  description: string;
+  included: boolean;
+  isChargeable: boolean;
+  price?: number;
+  currency?: string;
+}
+
+interface AmenityCategory {
+  key: string;
+  icon: string;
+  label: string;
+  items: CategoryItem[];
+}
+
+// ============================================================================
+// Smart Fallback / Inference Logic
+// ============================================================================
+
+function inferAmenities(offer: FlightOffer): InferredAmenity[] {
+  const cabin = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.cabin;
+  const brandedFare = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.brandedFare;
+  const bags = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.includedCheckedBags;
+
+  const amenities: InferredAmenity[] = [];
+
+  // Baggage — always show what's included
+  if (bags?.weight) {
+    amenities.push({
+      type: 'BAGGAGE',
+      description: `${bags.weight}${bags.weightUnit?.toLowerCase() || 'kg'} Aufgabegepäck inkl.`,
+      included: true,
+    });
+  } else if (bags?.quantity) {
+    amenities.push({
+      type: 'BAGGAGE',
+      description: `${bags.quantity}x Aufgabegepäck inkl.`,
+      included: true,
+    });
+  }
+
+  // Cabin-based inference
+  if (cabin === 'BUSINESS' || cabin === 'FIRST') {
+    amenities.push({ type: 'MEAL', description: 'Mahlzeiten & Getränke inkl.', included: true });
+    amenities.push({ type: 'LOUNGE', description: 'Lounge-Zugang', included: true });
+    amenities.push({ type: 'BRANDED_FARES', description: 'Priority Boarding', included: true });
+  } else if (cabin === 'PREMIUM_ECONOMY') {
+    amenities.push({ type: 'MEAL', description: 'Erweiterte Verpflegung', included: true });
+  }
+
+  // Branded fare inference
+  if (brandedFare) {
+    const bf = brandedFare.toUpperCase();
+    if (bf.includes('FLEX') || bf.includes('BUSINESS') || bf.includes('BIZ')) {
+      amenities.push({ type: 'BRANDED_FARES', description: 'Umbuchbar', included: true });
+    }
+    if (bf.includes('PREMIUM') || bf.includes('CLASSIC') || bf.includes('FLEX')) {
+      amenities.push({ type: 'BRANDED_FARES', description: 'Sitzplatzwahl inkl.', included: true });
+    }
+  }
+
+  return amenities;
+}
+
+function buildCategories(
+  ancillaryServices: AncillaryService[],
+  inferred: InferredAmenity[],
+  serviceOptions: Array<{ type: string; price: number; currency: string }>,
+): AmenityCategory[] {
+  const cats: Record<string, CategoryItem[]> = {
+    BAGGAGE: [],
+    MEAL: [],
+    LOUNGE: [],
+    EXTRAS: [],
+  };
+
+  const seen = new Set<string>();
+
+  // 1. Add API ancillary services
+  for (const svc of ancillaryServices) {
+    const dedup = `${svc.type}:${svc.description}`;
+    if (seen.has(dedup)) continue;
+    seen.add(dedup);
+
+    const bucket = svc.type === 'BAGGAGE' ? 'BAGGAGE'
+      : svc.type === 'MEAL' ? 'MEAL'
+      : svc.type === 'LOUNGE' ? 'LOUNGE'
+      : 'EXTRAS';
+
+    cats[bucket].push({
+      description: svc.description,
+      included: !svc.isChargeable,
+      isChargeable: svc.isChargeable,
+      price: svc.price,
+      currency: svc.currency,
+    });
+  }
+
+  // 2. Add inferred amenities (only if not already present from API)
+  for (const inf of inferred) {
+    const dedup = `${inf.type}:${inf.description}`;
+    if (seen.has(dedup)) continue;
+    seen.add(dedup);
+
+    const bucket = inf.type === 'BAGGAGE' ? 'BAGGAGE'
+      : inf.type === 'MEAL' ? 'MEAL'
+      : inf.type === 'LOUNGE' ? 'LOUNGE'
+      : 'EXTRAS';
+
+    cats[bucket].push({
+      description: inf.description,
+      included: inf.included,
+      isChargeable: !inf.included,
+      price: inf.price,
+      currency: inf.currency,
+    });
+  }
+
+  // 3. Add service options (purchasable services)
+  for (const svc of serviceOptions) {
+    const label = SERVICE_LABELS[svc.type] || svc.type;
+    const dedup = `SERVICE:${svc.type}`;
+    if (seen.has(dedup)) continue;
+    seen.add(dedup);
+
+    cats['EXTRAS'].push({
+      description: label,
+      included: false,
+      isChargeable: true,
+      price: svc.price,
+      currency: svc.currency,
+    });
+  }
+
+  const categoryConfig: Array<{ key: string; icon: string; label: string }> = [
+    { key: 'BAGGAGE', icon: '🧳', label: 'Gepäck' },
+    { key: 'MEAL', icon: '🍽️', label: 'Verpflegung' },
+    { key: 'LOUNGE', icon: '🛋️', label: 'Lounge' },
+    { key: 'EXTRAS', icon: '✨', label: 'Extras' },
+  ];
+
+  return categoryConfig
+    .map((cfg) => ({
+      ...cfg,
+      items: cats[cfg.key] || [],
+    }))
+    .filter((c) => c.items.length > 0);
+}
 
 // ============================================================================
 // Skeleton Components
@@ -43,6 +206,101 @@ function SkeletonCard({ lines = 3 }: { lines?: number }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// CategorySection — Collapsible category card
+// ============================================================================
+
+function CategorySection({ category }: { category: AmenityCategory }) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-5 py-4 flex items-center justify-between transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 min-h-[56px]"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-lg">{category.icon}</span>
+          <div className="text-left">
+            <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+              {category.label}
+            </h3>
+            {!open && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {category.items.length} {category.items.length === 1 ? 'Leistung' : 'Leistungen'}
+              </p>
+            )}
+          </div>
+        </div>
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-5 w-5 text-gray-400" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 pb-4 space-y-2">
+              {category.items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 py-2 px-3 rounded-xl bg-gray-50 dark:bg-gray-800/50"
+                >
+                  {/* Status icon */}
+                  <span className="shrink-0 text-base">
+                    {item.included ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">✅</span>
+                    ) : item.isChargeable && item.price && item.price > 0 ? (
+                      <span className="text-amber-500 dark:text-amber-400">💰</span>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500">❌</span>
+                    )}
+                  </span>
+
+                  {/* Description */}
+                  <span
+                    className={`flex-1 text-sm ${
+                      item.included
+                        ? 'text-gray-900 dark:text-gray-100'
+                        : item.isChargeable && item.price
+                        ? 'text-gray-700 dark:text-gray-300'
+                        : 'text-gray-400 dark:text-gray-500 line-through'
+                    }`}
+                  >
+                    {item.description}
+                  </span>
+
+                  {/* Price badge */}
+                  {item.included && (
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                      Inkl.
+                    </span>
+                  )}
+                  {!item.included && item.isChargeable && item.price != null && item.price > 0 && (
+                    <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                      +{formatCurrency(item.price, item.currency || 'EUR')}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -117,15 +375,9 @@ export function StepExtras() {
     return opts;
   }, [pricingData]);
 
-  const serviceOptions: ServiceOption[] = useMemo(() => {
-    if (!pricingData?.serviceOptions || pricingData.serviceOptions.length === 0)
-      return [];
-    return pricingData.serviceOptions.map((s) => ({
-      type: s.type,
-      label: SERVICE_LABELS[s.type] || s.type,
-      price: s.price,
-      currency: s.currency,
-    }));
+  const serviceOptions = useMemo(() => {
+    if (!pricingData?.serviceOptions || pricingData.serviceOptions.length === 0) return [];
+    return pricingData.serviceOptions;
   }, [pricingData]);
 
   // Fare rules: prefer from pricing API, fallback to cached in store
@@ -144,9 +396,16 @@ export function StepExtras() {
         description: r.description,
       })),
     }));
-  }, [pricingData]);
+  }, [pricingData, pricingResult]);
 
-  // ---- Included baggage from fare ----
+  // ---- Build 4 categories ----
+  const amenityCategories = useMemo(() => {
+    const ancillaryServices = pricingData?.ancillaryServices || [];
+    const inferred = offer ? inferAmenities(offer) : [];
+    return buildCategories(ancillaryServices, inferred, serviceOptions);
+  }, [pricingData, offer, serviceOptions]);
+
+  // ---- Included baggage from fare (for the baggage counter header) ----
   const includedBaggage = useMemo(() => {
     if (!offer) return '';
     const fd = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0];
@@ -163,6 +422,15 @@ export function StepExtras() {
     }
     return 'Gepäck laut Tarif';
   }, [offer]);
+
+  // ---- Branded fare label ----
+  const brandedFareLabel = useMemo(() => {
+    if (pricingData?.brandedFareLabel) return pricingData.brandedFareLabel;
+    if (pricingData?.brandedFare) return pricingData.brandedFare;
+    const bf = offer?.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.brandedFare;
+    const bfl = offer?.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.brandedFareLabel;
+    return bfl || bf || null;
+  }, [pricingData, offer]);
 
   // ---- Travelers for seatmap ----
   const seatmapTravelers = useMemo(() => {
@@ -241,13 +509,6 @@ export function StepExtras() {
     []
   );
 
-  const handleServiceChange = useCallback(
-    (type: string, checked: boolean) => {
-      setServiceSelections((prev) => ({ ...prev, [type]: checked }));
-    },
-    []
-  );
-
   const handleContinue = useCallback(() => {
     // Build ancillary selections for store
     const ancillaries: SelectedAncillary[] = [];
@@ -270,33 +531,13 @@ export function StepExtras() {
       }
     }
 
-    // Services
-    for (const [type, checked] of Object.entries(serviceSelections)) {
-      if (checked) {
-        const opt = serviceOptions.find((s) => s.type === type);
-        if (opt) {
-          const mappedType = (['PRIORITY_BOARDING', 'AIRPORT_CHECKIN'].includes(type)
-            ? type
-            : 'PRIORITY_BOARDING') as SelectedAncillary['type'];
-          ancillaries.push({
-            type: mappedType,
-            travelerId: '1', // Apply to all
-            quantity: 1,
-            price: opt.price,
-            currency: opt.currency,
-          });
-        }
-      }
-    }
-
     setAncillaries(ancillaries);
     setStep(3);
-  }, [bagSelections, serviceSelections, bagOptions, serviceOptions, setAncillaries, setStep]);
+  }, [bagSelections, bagOptions, setAncillaries, setStep]);
 
   if (!offer) return null;
 
   const hasBagOptions = bagOptions.length > 0;
-  const hasServiceOptions = serviceOptions.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -315,6 +556,20 @@ export function StepExtras() {
       </div>
 
       <div className="mx-auto max-w-[900px] px-4 py-6 space-y-6">
+        {/* ======== Branded Fare Badge ======== */}
+        {brandedFareLabel && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+          >
+            <span className="text-sm">🏷️</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Tarif: {brandedFareLabel}
+            </span>
+          </motion.div>
+        )}
+
         {/* ======== 💺 Sitzplatzwahl ======== */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
@@ -335,8 +590,6 @@ export function StepExtras() {
             </div>
             <div className="p-5 space-y-3">
               {offer.itineraries.map((itin, idx) => {
-                const first = itin.segments[0];
-                const last = itin.segments[itin.segments.length - 1];
                 const routePoints = itin.segments
                   .map((s) => s.departure.iataCode)
                   .concat(itin.segments[itin.segments.length - 1].arrival.iataCode);
@@ -401,38 +654,52 @@ export function StepExtras() {
           </div>
         </motion.section>
 
-        {/* ======== 🧳 Zusatzgepäck ======== */}
+        {/* ======== 🧳 Zusatzleistungen — 4 Categories ======== */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
           {pricingLoading ? (
-            <SkeletonCard lines={2} />
+            <div className="space-y-4">
+              <SkeletonCard lines={3} />
+              <SkeletonCard lines={2} />
+            </div>
           ) : (
-            <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+            <div className="space-y-4">
+              {/* Section header */}
+              <div className="flex items-center gap-3 px-1">
                 <Luggage className="h-5 w-5 text-pink-500" />
                 <div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                    🧳 Zusatzgepäck
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Zusatzleistungen
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Zusätzliches Aufgabegepäck buchen
+                    Gepäck, Verpflegung, Lounge & Extras
                   </p>
                 </div>
               </div>
-              <div className="p-5 space-y-4">
-                {/* Included baggage info */}
-                <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                  <span>✅</span>
-                  <span>
-                    Inkl: {includedBaggage} pro Person
-                  </span>
-                </div>
 
-                {hasBagOptions ? (
-                  <>
+              {/* Category cards */}
+              {amenityCategories.map((cat) => (
+                <CategorySection key={cat.key} category={cat} />
+              ))}
+
+              {/* Extra Baggage Counter (purchasable bags) */}
+              {hasBagOptions && (
+                <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+                    <span className="text-lg">🧳</span>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                        Zusatzgepäck buchen
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Inkl: {includedBaggage} pro Person
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-5 space-y-4">
                     {travelers
                       .filter((t) => t.type !== 'INFANT')
                       .map((t, idx) => {
@@ -451,59 +718,34 @@ export function StepExtras() {
                           />
                         );
                       })}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Inkl. Gepäck laut Tarif. Kein Zusatzgepäck verfügbar.
-                  </p>
-                )}
+                  </div>
+                </div>
+              )}
 
-                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                  Kein Extra nötig? Einfach überspringen.
+              {/* No amenities at all? Show a minimal message */}
+              {amenityCategories.length === 0 && !hasBagOptions && (
+                <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm p-5">
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                    <span>✅</span>
+                    <span>Inkl: {includedBaggage} pro Person</span>
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Keine zusätzlichen Leistungen verfügbar für diesen Tarif.
+                  </p>
+                </div>
+              )}
+
+              {/* Info note */}
+              <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <Info className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Verfügbare Zusatzleistungen hängen von der Airline und dem Tarif ab.
+                  Nicht alle Leistungen können online gebucht werden.
                 </p>
               </div>
             </div>
           )}
         </motion.section>
-
-        {/* ======== ⚡ Weitere Services ======== */}
-        {(pricingLoading || hasServiceOptions) && (
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
-          >
-            {pricingLoading ? (
-              <SkeletonCard lines={2} />
-            ) : (
-              <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
-                  <Zap className="h-5 w-5 text-pink-500" />
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                      ⚡ Weitere Services
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Priority Boarding, Check-in & mehr
-                    </p>
-                  </div>
-                </div>
-                <div className="p-5 space-y-3">
-                  {serviceOptions.map((service) => (
-                    <ServiceToggle
-                      key={service.type}
-                      service={service}
-                      checked={!!serviceSelections[service.type]}
-                      onChange={(checked) =>
-                        handleServiceChange(service.type, checked)
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.section>
-        )}
 
         {/* ======== 📋 Tarifbedingungen ======== */}
         <motion.section

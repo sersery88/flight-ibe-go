@@ -438,6 +438,21 @@ func (a *Adapter) PriceOffersWithAncillaries(ctx context.Context, offers []domai
 	result.ServiceOptions = a.parseServiceOptions(body)
 	result.FareRules = a.parseFareRules(body)
 	result.CreditCardFees = a.parseCreditCardFees(body)
+	result.AncillaryServices = a.parseAncillaryServices(body)
+
+	// Extract brandedFare and brandedFareLabel from first traveler pricing
+	if len(result.FlightOffers) > 0 {
+		offer := result.FlightOffers[0]
+		if len(offer.TravelerPricings) > 0 && len(offer.TravelerPricings[0].FareDetailsBySegment) > 0 {
+			fd := offer.TravelerPricings[0].FareDetailsBySegment[0]
+			result.BrandedFare = fd.BrandedFare
+		}
+	}
+	// Also try to get brandedFareLabel from raw JSON (not in domain struct yet)
+	brandedFareLabel := a.parseBrandedFareLabel(body)
+	if brandedFareLabel != "" {
+		result.BrandedFareLabel = brandedFareLabel
+	}
 
 	a.logger.InfoContext(ctx, "pricing with ancillaries completed",
 		slog.Int("offers", len(result.FlightOffers)),
@@ -445,6 +460,9 @@ func (a *Adapter) PriceOffersWithAncillaries(ctx context.Context, offers []domai
 		slog.Int("serviceOptions", len(result.ServiceOptions)),
 		slog.Int("fareRules", len(result.FareRules)),
 		slog.Int("creditCardFees", len(result.CreditCardFees)),
+		slog.Int("ancillaryServices", len(result.AncillaryServices)),
+		slog.String("brandedFare", result.BrandedFare),
+		slog.String("brandedFareLabel", result.BrandedFareLabel),
 	)
 
 	return result, nil
@@ -846,6 +864,108 @@ func (a *Adapter) parseCreditCardFees(body []byte) []domain.CreditCardFee {
 	}
 
 	return fees
+}
+
+// parseAncillaryServices extracts amenities from travelerPricings[].fareDetailsBySegment[].amenities[]
+func (a *Adapter) parseAncillaryServices(body []byte) []domain.AncillaryService {
+	var services []domain.AncillaryService
+
+	var parsed struct {
+		Data struct {
+			FlightOffers []struct {
+				TravelerPricings []struct {
+					TravelerID           string `json:"travelerId"`
+					FareDetailsBySegment []struct {
+						SegmentID   string `json:"segmentId"`
+						BrandedFare string `json:"brandedFare,omitempty"`
+						Amenities   []struct {
+							Description   string `json:"description"`
+							IsChargeable  bool   `json:"isChargeable"`
+							AmenityType   string `json:"amenityType"`
+							AmenityProvider struct {
+								Name string `json:"name"`
+							} `json:"amenityProvider"`
+						} `json:"amenities"`
+					} `json:"fareDetailsBySegment"`
+				} `json:"travelerPricings"`
+			} `json:"flightOffers"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		a.logger.Debug("failed to parse ancillary services", slog.String("error", err.Error()))
+		return services
+	}
+
+	// Map Amadeus amenityType to our types
+	typeMap := map[string]string{
+		"BAGGAGE":           "BAGGAGE",
+		"BRANDED_FARES":     "BRANDED_FARES",
+		"MEAL":              "MEAL",
+		"BEVERAGE":          "MEAL",
+		"LOUNGE":            "LOUNGE",
+		"WIFI":              "BRANDED_FARES",
+		"ENTERTAINMENT":     "BRANDED_FARES",
+		"PRE_RESERVED_SEAT": "BRANDED_FARES",
+	}
+
+	seen := make(map[string]bool) // Deduplicate by description+type
+
+	for _, offer := range parsed.Data.FlightOffers {
+		for _, tp := range offer.TravelerPricings {
+			for _, fd := range tp.FareDetailsBySegment {
+				for _, amenity := range fd.Amenities {
+					svcType := typeMap[strings.ToUpper(amenity.AmenityType)]
+					if svcType == "" {
+						svcType = "BRANDED_FARES" // Default to extras
+					}
+
+					dedup := svcType + ":" + amenity.Description
+					if seen[dedup] {
+						continue
+					}
+					seen[dedup] = true
+
+					services = append(services, domain.AncillaryService{
+						Type:         svcType,
+						Description:  amenity.Description,
+						IsChargeable: amenity.IsChargeable,
+						SegmentID:    fd.SegmentID,
+						TravelerID:   tp.TravelerID,
+					})
+				}
+			}
+		}
+	}
+
+	return services
+}
+
+// parseBrandedFareLabel extracts the brandedFareLabel from raw JSON
+func (a *Adapter) parseBrandedFareLabel(body []byte) string {
+	var parsed struct {
+		Data struct {
+			FlightOffers []struct {
+				TravelerPricings []struct {
+					FareDetailsBySegment []struct {
+						BrandedFareLabel string `json:"brandedFareLabel,omitempty"`
+					} `json:"fareDetailsBySegment"`
+				} `json:"travelerPricings"`
+			} `json:"flightOffers"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return ""
+	}
+
+	if len(parsed.Data.FlightOffers) > 0 &&
+		len(parsed.Data.FlightOffers[0].TravelerPricings) > 0 &&
+		len(parsed.Data.FlightOffers[0].TravelerPricings[0].FareDetailsBySegment) > 0 {
+		return parsed.Data.FlightOffers[0].TravelerPricings[0].FareDetailsBySegment[0].BrandedFareLabel
+	}
+
+	return ""
 }
 
 // CreateBookingOrder implements domain.FlightBooker — creates a PNR with traveler data
