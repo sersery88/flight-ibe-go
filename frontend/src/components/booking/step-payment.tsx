@@ -273,7 +273,7 @@ export function StepPayment() {
                   onClick={() => setStornoAccepted(!stornoAccepted)}
                 >
                   Ich habe die{' '}
-                  <span className="font-medium">Storno- und Umbuchungsbedingungen</span>{' '}
+                  <span className="font-medium">Tarifbedingungen</span>{' '}
                   gelesen und akzeptiere diese.
                 </span>
               </div>
@@ -334,7 +334,7 @@ export function StepPayment() {
                       ? '💳 Bitte wähle eine Zahlungsmethode.'
                       : !agbAccepted
                         ? '📋 Bitte akzeptiere die AGB und Datenschutzerklärung.'
-                        : '📋 Bitte bestätige die Storno- und Umbuchungsbedingungen.'}
+                        : '📋 Bitte bestätige die Tarifbedingungen.'}
                   </p>
                 </div>
               </motion.div>
