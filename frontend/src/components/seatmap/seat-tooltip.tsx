@@ -23,7 +23,7 @@ interface CharBadge {
 }
 
 // Position codes — displayed in header, not as badges
-const POSITION_CODES = new Set(['W', 'A', 'M', 'CC']);
+const SKIP_CODES = new Set(['W', 'A', 'M', 'CC', 'CH', '1A', 'N', 'R', 'RS']);
 
 // ============================================================================
 // Build grouped characteristics
@@ -34,7 +34,7 @@ function buildCharacteristicBadges(codes?: string[]): CharBadge[] {
   const badges: CharBadge[] = [];
 
   for (const code of codes) {
-    if (POSITION_CODES.has(code)) continue; // handled separately in header
+    if (SKIP_CODES.has(code)) continue;
     const def = getSeatCharacteristic(code);
     if (!def) continue;
 

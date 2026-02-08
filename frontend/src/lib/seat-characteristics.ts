@@ -38,7 +38,7 @@ export const SEAT_CHARACTERISTICS: Record<string, SeatCharacteristicDef> = {
 
   // ---- Accessibility ----
   'H':  { label: 'Rollstuhlgerecht', icon: '♿' },
-  'CH': { label: 'Für Begleithund', icon: '🐕' },
+  'CH': { label: 'Kostenpflichtiger Sitz', icon: '💳' },
 
   // ---- View / Comfort ----
   'V':  { label: 'Eingeschränkte Sicht', icon: '👁️', warning: true },
@@ -57,7 +57,7 @@ export const SEAT_CHARACTERISTICS: Record<string, SeatCharacteristicDef> = {
   'RS': { label: 'Rechte Seite', icon: '➡️' },
 
   // ---- Amadeus Extensions ----
-  '1A': { label: 'Premium Sitzplatz', icon: '⭐' },
+  '1A': { label: 'Kostenpflichtig', icon: '💳' }, // Generic Amadeus chargeable indicator
   '1A_AQC_PREMIUM_SEAT': { label: 'Premium Sitzplatz', icon: '⭐' },
   'P':  { label: 'Preferred Sitzplatz', icon: '⭐' },
   'UP': { label: 'Upgrade möglich', icon: '⬆️' },

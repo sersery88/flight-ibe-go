@@ -45,12 +45,14 @@ export function getSeatCategory(codes?: string[]): SeatCategory {
 
   // Priority order — first match wins
   if (codes.includes('E') || codes.includes('IE')) return 'exit';
-  if (codes.some(c => ['P', 'PS', '1A', 'EC'].includes(c))) return 'preferred';
+  // Only full premium code, NOT bare '1A' (which is generic Amadeus "chargeable")
+  if (codes.some(c => ['P', 'PS', '1A_AQC_PREMIUM_SEAT', 'EC'].includes(c))) return 'preferred';
   if (codes.includes('L') || codes.includes('XL')) return 'extraleg';
   if (codes.includes('K')) return 'bulkhead';
   if (codes.includes('B') || codes.includes('BK')) return 'bassinet';
   if (codes.includes('H')) return 'accessible';
-  if (codes.includes('CH')) return 'pet';
+  // CH = "Chargeable" in Amadeus, NOT pet-friendly. Real pet code would be specific.
+  // if (codes.includes('CH')) return 'pet';
 
   return 'standard';
 }

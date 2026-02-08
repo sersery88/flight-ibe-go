@@ -10,7 +10,8 @@ import { getSeatCategory, CATEGORY_STYLES, type SeatCategory } from '@/lib/seat-
 // Codes to SKIP in the detail list (handled by category badge or position)
 // ============================================================================
 
-const POSITION_CODES = new Set(['W', 'A', 'M', 'CC']);
+// Codes to skip entirely in the UI (position handled separately, generic codes not useful)
+const SKIP_CODES = new Set(['W', 'A', 'M', 'CC', 'CH', '1A', 'N', 'R', 'RS']);
 
 // Codes that are already represented by the category badge — don't repeat them
 const CATEGORY_CODES: Record<SeatCategory, Set<string>> = {
@@ -20,7 +21,7 @@ const CATEGORY_CODES: Record<SeatCategory, Set<string>> = {
   bulkhead:   new Set(['K']),
   bassinet:   new Set(['B', 'BK']),
   accessible: new Set(['H']),
-  pet:        new Set(['CH']),
+  pet:        new Set([]),  // CH = Chargeable, not pet
   restricted: new Set(),
   standard:   new Set(),
 };
@@ -43,7 +44,7 @@ function buildUniqueCharacteristics(codes: string[] | undefined, category: SeatC
   const items: CharItem[] = [];
 
   for (const code of codes) {
-    if (POSITION_CODES.has(code)) continue;
+    if (SKIP_CODES.has(code)) continue;
     if (skipCodes.has(code)) continue;
     
     const def = getSeatCharacteristic(code);
