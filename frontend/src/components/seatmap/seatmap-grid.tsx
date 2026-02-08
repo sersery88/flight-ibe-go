@@ -110,6 +110,18 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
   const columnMap = useMemo(() => buildColumnMap(columns, aisles), [columns, aisles]);
   const rowMap = useMemo(() => buildRowMap(rowRange, rowGaps), [rowRange, rowGaps]);
 
+  // Map X-coordinate → actual seat row number (e.g. X=0 → row 11 from seat "11A")
+  const xToRowLabel = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const seat of deck.seats) {
+      const x = seat.coordinates?.x;
+      if (x == null || map.has(x)) continue;
+      const match = seat.number.match(/^(\d+)/);
+      if (match) map.set(x, match[1]);
+    }
+    return map;
+  }, [deck.seats]);
+
   const selectedNumbers = useMemo(
     () => new Set(Object.values(selectedSeats).map((s) => s.number)),
     [selectedSeats]
@@ -220,7 +232,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                 role="rowheader"
               >
                 {isWing && <span className="text-[8px]" title="Flügelbereich">✈</span>}
-                <span>{rowNum}</span>
+                <span>{xToRowLabel.get(rowNum) ?? rowNum}</span>
               </div>
             );
           })}
