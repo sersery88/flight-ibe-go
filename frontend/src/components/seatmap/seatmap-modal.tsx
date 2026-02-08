@@ -147,7 +147,7 @@ export function SeatmapModal({
   );
   const [exitRowDialogOpen, setExitRowDialogOpen] = useState(false);
   const [pendingExitSeat, setPendingExitSeat] = useState<Seat | null>(null);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   // --- New states for v3 ---
   const [activeFilter, setActiveFilter] = useState<SeatCategory | null>(null);
@@ -503,13 +503,19 @@ export function SeatmapModal({
                   <button
                     type="button"
                     onClick={() => setLegendOpen(!legendOpen)}
-                    className="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+                    className={[
+                      'flex items-center justify-between w-full px-4 py-2.5 text-xs font-medium transition-colors',
+                      legendOpen
+                        ? 'text-muted-foreground hover:bg-muted/50'
+                        : 'text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/30 hover:bg-pink-100 dark:hover:bg-pink-950/50',
+                    ].join(' ')}
                   >
-                    <span>
-                      Filter
+                    <span className="flex items-center gap-1.5">
+                      {!legendOpen && <span className="text-sm">🎛️</span>}
+                      <span>Sitzplatz-Filter</span>
                       {activeFilter && (
-                        <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
-                          Filter aktiv
+                        <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
+                          aktiv
                         </span>
                       )}
                     </span>
