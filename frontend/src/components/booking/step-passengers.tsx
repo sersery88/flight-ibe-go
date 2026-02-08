@@ -29,7 +29,7 @@ import { Radio } from '@base-ui/react/radio';
 import { Separator } from '@base-ui/react/separator';
 import { useBookingFlowStore, type TravelerData, type ContactData } from '@/stores/booking-flow-store';
 import { useSearchStore } from '@/stores/search-store';
-import { createBookingOrder } from '@/lib/api-client';
+import { createBookingOrder, priceOffersWithAncillaries } from '@/lib/api-client';
 import {
   formatCurrency,
   formatDuration,
@@ -341,6 +341,23 @@ export function StepPassengers() {
           contact,
         });
         setOrder(orderResult.orderId, orderResult.pnrReference);
+
+        // Fetch fare rules in background (before offer expires)
+        if (offer) {
+          priceOffersWithAncillaries([offer], ['detailed-fare-rules'])
+            .then((pricing) => {
+              if (pricing.fareRules && pricing.fareRules.length > 0) {
+                const { setPricing } = useBookingFlowStore.getState();
+                setPricing({
+                  totalPrice: parseFloat(offer.price.grandTotal),
+                  currency: offer.price.currency,
+                  pricePerTraveler: {},
+                  fareRules: pricing.fareRules,
+                });
+              }
+            })
+            .catch(() => { /* fare rules are optional */ });
+        }
 
         // Check for price change (if the API response includes pricing data)
         const resultAny = orderResult as unknown as Record<string, unknown>;

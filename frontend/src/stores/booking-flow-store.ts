@@ -28,11 +28,23 @@ export interface ContactData {
   phoneCountryCode: string;
 }
 
+export interface FareRuleData {
+  segmentId: string;
+  rules: Array<{
+    category: string;
+    notApplicable: boolean;
+    maxPenalty?: number;
+    currency?: string;
+    description?: string;
+  }>;
+}
+
 export interface PricingResult {
   totalPrice: number;
   currency: string;
   pricePerTraveler: Record<string, number>;
   ancillaryOptions?: AncillaryOption[];
+  fareRules?: FareRuleData[];
 }
 
 export interface AncillaryOption {

@@ -56,6 +56,7 @@ export function StepExtras() {
     offer,
     travelers,
     orderId,
+    pricingResult,
     setStep,
     setAncillaries,
   } = useBookingFlowStore();
@@ -127,9 +128,13 @@ export function StepExtras() {
     }));
   }, [pricingData]);
 
+  // Fare rules: prefer from pricing API, fallback to cached in store
   const fareRules: FareRuleGroup[] = useMemo(() => {
-    if (!pricingData?.fareRules || pricingData.fareRules.length === 0) return [];
-    return pricingData.fareRules.map((group) => ({
+    const apiRules = pricingData?.fareRules;
+    const cachedRules = pricingResult?.fareRules;
+    const rules = (apiRules && apiRules.length > 0) ? apiRules : cachedRules;
+    if (!rules || rules.length === 0) return [];
+    return rules.map((group) => ({
       segmentId: group.segmentId,
       rules: group.rules.map((r) => ({
         category: r.category,
