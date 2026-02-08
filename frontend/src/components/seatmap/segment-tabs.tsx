@@ -2,7 +2,6 @@
 
 import React from 'react';
 import type { SeatmapData } from '@/types/seatmap';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // ============================================================================
 // Types
@@ -46,27 +45,32 @@ export function SegmentTabs({ segments, activeSegmentId, onSegmentChange }: Segm
   if (segments.length <= 1) return null;
 
   return (
-    <Tabs value={activeSegmentId} onValueChange={onSegmentChange}>
-      <TabsList className="w-full">
-        {segments.map((segment) => {
-          const id = segment.segmentId ?? segment.flightOfferId ?? '0';
-          const label = getSegmentLabel(segment);
-          const subtitle = getSegmentSubtitle(segment);
-
-          return (
-            <TabsTrigger key={id} value={id} className="flex-1 flex-col gap-0 py-1.5">
-              <span className="text-sm font-medium">{label}</span>
-              <span className="text-[10px] text-muted-foreground">{subtitle}</span>
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
-
-      {/* Content panels are rendered externally */}
+    <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800/60" role="tablist">
       {segments.map((segment) => {
         const id = segment.segmentId ?? segment.flightOfferId ?? '0';
-        return <TabsContent key={id} value={id} />;
+        const isActive = id === activeSegmentId;
+        const label = getSegmentLabel(segment);
+        const subtitle = getSegmentSubtitle(segment);
+
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSegmentChange(id)}
+            className={[
+              'flex-1 flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-center transition-all',
+              isActive
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm font-semibold'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300',
+            ].join(' ')}
+          >
+            <span className="text-xs sm:text-sm leading-tight">{label}</span>
+            <span className={`text-[10px] leading-tight ${isActive ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>{subtitle}</span>
+          </button>
+        );
       })}
-    </Tabs>
+    </div>
   );
 }
