@@ -255,40 +255,35 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             );
           })}
 
-          {/* Row numbers (LEFT) */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => (
-            <div
-              key={`row-${rowNum}`}
-              className="text-xs font-medium text-muted-foreground flex items-center justify-end pr-1 w-full"
-              style={{ gridRow, gridColumn: 1 }}
-              role="rowheader"
-            >
-              {xToRowLabel.get(rowNum) ?? rowNum}
-            </div>
-          ))}
-
-          {/* Exit signs — green emergency exit badge on outer edges */}
+          {/* Row numbers (LEFT) + EXIT signs on outer edges */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-            if (!exitRows.has(rowNum)) return null;
-            const exitBadge = (
-              <span className="inline-flex items-center gap-px rounded bg-emerald-600 px-1 py-0.5 shadow-sm shadow-emerald-500/30 animate-pulse">
-                <span className="text-[7px] font-black text-white tracking-wider leading-none">EXIT</span>
-              </span>
-            );
+            const isExit = exitRows.has(rowNum);
             return (
-              <React.Fragment key={`exit-${rowNum}`}>
+              <React.Fragment key={`row-${rowNum}`}>
+                {/* Left side: row number + exit badge */}
                 <div
-                  className="flex items-center justify-center pointer-events-none"
-                  style={{ gridRow, gridColumn: 2 }}
+                  className="flex items-center justify-end gap-1 pr-1 w-full"
+                  style={{ gridRow, gridColumn: 1 }}
+                  role="rowheader"
                 >
-                  {exitBadge}
+                  {isExit && (
+                    <span className="inline-flex items-center rounded bg-emerald-600 px-0.5 py-px shadow-sm shadow-emerald-500/30 animate-pulse">
+                      <span className="text-[6px] font-black text-white tracking-wider leading-none">EXIT</span>
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-muted-foreground">{xToRowLabel.get(rowNum) ?? rowNum}</span>
                 </div>
-                <div
-                  className="flex items-center justify-center pointer-events-none"
-                  style={{ gridRow, gridColumn: rightLabelCol - 1 }}
-                >
-                  {exitBadge}
-                </div>
+                {/* Right side: exit badge */}
+                {isExit && (
+                  <div
+                    className="flex items-center justify-start pl-1"
+                    style={{ gridRow, gridColumn: rightLabelCol }}
+                  >
+                    <span className="inline-flex items-center rounded bg-emerald-600 px-0.5 py-px shadow-sm shadow-emerald-500/30 animate-pulse">
+                      <span className="text-[6px] font-black text-white tracking-wider leading-none">EXIT</span>
+                    </span>
+                  </div>
+                )}
               </React.Fragment>
             );
           })}
