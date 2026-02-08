@@ -202,8 +202,8 @@ export function SeatDetailSheet({
                 <p className="text-sm text-muted-foreground text-center py-2">Nicht verfügbar.</p>
               )}
 
-              {/* Select / Deselect button */}
-              {!disabled && status === 'AVAILABLE' && isSelected && onDeselect && seat && (
+              {/* Deselect button (selected seat) */}
+              {isSelected && onDeselect && seat && (
                 <button
                   type="button"
                   onClick={() => { onDeselect(seat); onClose(); }}
@@ -212,7 +212,8 @@ export function SeatDetailSheet({
                   Auswahl aufheben
                 </button>
               )}
-              {!disabled && status === 'AVAILABLE' && !isSelected && (
+              {/* Select button (available, not selected) */}
+              {!disabled && (status === 'AVAILABLE' || status === 'SELECTED') && !isSelected && (
                 <button
                   type="button"
                   onClick={handleSelect}
