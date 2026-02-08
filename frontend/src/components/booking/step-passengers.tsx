@@ -1475,7 +1475,7 @@ function NationalitySelect({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl bg-white dark:bg-gray-800 shadow-2xl max-h-[70vh] flex flex-col sm:inset-auto sm:absolute sm:bottom-auto sm:top-full sm:mt-1.5 sm:w-full sm:rounded-xl sm:max-h-80"
+              className="fixed inset-x-0 top-0 bottom-0 z-[9999] bg-white dark:bg-gray-800 shadow-2xl flex flex-col sm:inset-auto sm:absolute sm:top-full sm:mt-1.5 sm:w-full sm:rounded-xl sm:max-h-80"
             >
               {/* Drag handle (mobile) */}
               <div className="flex justify-center pt-2 pb-1 sm:hidden">
