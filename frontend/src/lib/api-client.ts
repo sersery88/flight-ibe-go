@@ -233,10 +233,9 @@ export async function cancelBooking(orderId: string): Promise<void> {
 }
 
 // Get Branded Fares / Upsell Options
-// Note: Upsell not implemented in Go backend yet
+// Go: POST /api/flights/upsell
 export async function getUpsellOffers(offers: FlightOffer[]): Promise<FlightOffersResponse> {
-  console.warn('Upsell not yet implemented in Go backend');
-  return { data: [], dictionaries: {} };
+  return apiClient.post<FlightOffersResponse>('/flights/upsell', { flightOffers: offers });
 }
 
 // Flight Cheapest Date Search

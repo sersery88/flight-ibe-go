@@ -138,6 +138,42 @@ func (h *FlightHandler) PriceFlights(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// UpsellFlights handles branded fare / upsell requests
+// @Summary Get branded fare upsell options
+// @Description Get branded fare variants for selected flight offers
+// @Tags flights
+// @Accept json
+// @Produce json
+// @Param request body UpsellRequest true "Flight offers to upsell"
+// @Success 200 {object} domain.FlightSearchResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/flights/upsell [post]
+func (h *FlightHandler) UpsellFlights(c *gin.Context) {
+	var req UpsellRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	response, err := h.service.UpsellFlights(c.Request.Context(), req.FlightOffers)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "upsell failed",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "upsell request failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // CreateBooking handles booking creation requests
 // @Summary Create a flight booking
 // @Description Book selected flight offers
@@ -228,6 +264,65 @@ func (h *FlightHandler) CancelBooking(c *gin.Context) {
 	c.JSON(http.StatusOK, SuccessResponse{Message: "order cancelled successfully"})
 }
 
+// LocationHandler handles location search HTTP requests
+type LocationHandler struct {
+	searcher domain.LocationSearcher
+	logger   *slog.Logger
+}
+
+// NewLocationHandler creates a new LocationHandler
+func NewLocationHandler(searcher domain.LocationSearcher, logger *slog.Logger) *LocationHandler {
+	return &LocationHandler{
+		searcher: searcher,
+		logger:   logger,
+	}
+}
+
+// SearchLocations handles location search requests
+// @Summary Search locations
+// @Description Search for airports and cities by keyword
+// @Tags locations
+// @Produce json
+// @Param keyword query string true "Search keyword (min 1 char)"
+// @Param subType query string false "Location subtype filter" default(CITY,AIRPORT)
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/locations [get]
+func (h *LocationHandler) SearchLocations(c *gin.Context) {
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: "keyword parameter is required",
+		})
+		return
+	}
+
+	subType := c.DefaultQuery("subType", "CITY,AIRPORT")
+
+	h.logger.InfoContext(c.Request.Context(), "searching locations",
+		slog.String("keyword", keyword),
+		slog.String("subType", subType),
+	)
+
+	results, err := h.searcher.SearchLocations(c.Request.Context(), keyword, subType)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "location search failed",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "location search failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": results,
+	})
+}
+
 // Request/Response types
 
 // ErrorResponse represents an error response
@@ -244,6 +339,70 @@ type SuccessResponse struct {
 // PriceRequest represents a pricing request
 type PriceRequest struct {
 	FlightOffers []domain.FlightOffer `json:"flightOffers" binding:"required"`
+}
+
+// UpsellRequest represents an upsell/branded fares request
+type UpsellRequest struct {
+	FlightOffers []domain.FlightOffer `json:"flightOffers" binding:"required"`
+}
+
+// SeatmapRequest represents a seatmap request
+type SeatmapRequest struct {
+	Offer *domain.FlightOffer `json:"offer" binding:"required"`
+}
+
+// SeatmapHandler handles seatmap-related HTTP requests
+type SeatmapHandler struct {
+	provider domain.SeatmapProvider
+	logger   *slog.Logger
+}
+
+// NewSeatmapHandler creates a new SeatmapHandler
+func NewSeatmapHandler(provider domain.SeatmapProvider, logger *slog.Logger) *SeatmapHandler {
+	return &SeatmapHandler{
+		provider: provider,
+		logger:   logger,
+	}
+}
+
+// GetSeatmap handles seatmap retrieval requests
+// @Summary Get seatmap for a flight offer
+// @Description Retrieves seatmap data for a given flight offer
+// @Tags flights
+// @Accept json
+// @Produce json
+// @Param request body SeatmapRequest true "Flight offer"
+// @Success 200 {object} domain.SeatmapResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/flights/seatmap [post]
+func (h *SeatmapHandler) GetSeatmap(c *gin.Context) {
+	var req SeatmapRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid request",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	h.logger.InfoContext(c.Request.Context(), "fetching seatmap",
+		slog.String("offerId", req.Offer.ID),
+	)
+
+	response, err := h.provider.GetSeatmap(c.Request.Context(), []domain.FlightOffer{*req.Offer})
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "seatmap request failed",
+			slog.String("error", err.Error()),
+		)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "seatmap request failed",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // HealthHandler handles health check requests

@@ -215,6 +215,42 @@ select {
   accent-color: oklch(0.65 0.24 330);
 }
 
+/* Shimmer/skeleton effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.9 0 0 / 40%) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.dark .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.3 0 0 / 30%) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Smooth button press */
+.press-effect {
+  transition: transform 0.1s ease;
+}
+
+.press-effect:active {
+  transform: scale(0.97);
+}
+
 /* Motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

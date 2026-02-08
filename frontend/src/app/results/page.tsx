@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Calendar, Users, Plane as PlaneIcon, Search, ArrowRightLeft, Edit2, SlidersHorizontal, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,75 +54,53 @@ function getPassengerCount(adults: number, children: number, infants: number): n
 }
 
 // ============================================================================
-// Filter Logic (extracted for testability)
+// Filter Logic
 // ============================================================================
 
 function applyFilters(offers: FlightOffer[], filters: FlightFilters): FlightOffer[] {
   return offers.filter((offer) => {
-    // Filter by stops
     if (filters.stops.length > 0) {
       const stops = offer.itineraries[0].segments.length - 1;
-      const stopCategory = stops >= 2 ? 2 : stops;
-      if (!filters.stops.includes(stopCategory)) return false;
+      const cat = stops >= 2 ? 2 : stops;
+      if (!filters.stops.includes(cat)) return false;
     }
 
-    // Filter by airlines (main carrier)
     if (filters.airlines.length > 0) {
       const mainCarrier = offer.validatingAirlineCodes?.[0] || offer.itineraries[0].segments[0].carrierCode;
       if (!filters.airlines.includes(mainCarrier)) return false;
     }
 
-    // Filter by price
     const price = parseFloat(offer.price.total);
     if (price < filters.priceRange[0] || price > filters.priceRange[1]) return false;
 
-    // Filter by outbound departure time
     if (filters.outboundDepartureTime[0] > 0 || filters.outboundDepartureTime[1] < 24) {
-      const depTime = new Date(offer.itineraries[0].segments[0].departure.at);
-      const hour = depTime.getHours();
-      if (hour < filters.outboundDepartureTime[0] || hour >= filters.outboundDepartureTime[1]) {
-        return false;
-      }
+      const hour = new Date(offer.itineraries[0].segments[0].departure.at).getHours();
+      if (hour < filters.outboundDepartureTime[0] || hour >= filters.outboundDepartureTime[1]) return false;
     }
 
-    // Filter by outbound arrival time
     if (filters.outboundArrivalTime[0] > 0 || filters.outboundArrivalTime[1] < 24) {
-      const lastSegment = offer.itineraries[0].segments[offer.itineraries[0].segments.length - 1];
-      const arrTime = new Date(lastSegment.arrival.at);
-      const hour = arrTime.getHours();
-      if (hour < filters.outboundArrivalTime[0] || hour >= filters.outboundArrivalTime[1]) {
-        return false;
+      const segs = offer.itineraries[0].segments;
+      const hour = new Date(segs[segs.length - 1].arrival.at).getHours();
+      if (hour < filters.outboundArrivalTime[0] || hour >= filters.outboundArrivalTime[1]) return false;
+    }
+
+    if (offer.itineraries.length > 1) {
+      if (filters.returnDepartureTime[0] > 0 || filters.returnDepartureTime[1] < 24) {
+        const hour = new Date(offer.itineraries[1].segments[0].departure.at).getHours();
+        if (hour < filters.returnDepartureTime[0] || hour >= filters.returnDepartureTime[1]) return false;
+      }
+      if (filters.returnArrivalTime[0] > 0 || filters.returnArrivalTime[1] < 24) {
+        const segs = offer.itineraries[1].segments;
+        const hour = new Date(segs[segs.length - 1].arrival.at).getHours();
+        if (hour < filters.returnArrivalTime[0] || hour >= filters.returnArrivalTime[1]) return false;
       }
     }
 
-    // Filter by return departure time
-    if (offer.itineraries.length > 1 && (filters.returnDepartureTime[0] > 0 || filters.returnDepartureTime[1] < 24)) {
-      const depTime = new Date(offer.itineraries[1].segments[0].departure.at);
-      const hour = depTime.getHours();
-      if (hour < filters.returnDepartureTime[0] || hour >= filters.returnDepartureTime[1]) {
-        return false;
-      }
-    }
-
-    // Filter by return arrival time
-    if (offer.itineraries.length > 1 && (filters.returnArrivalTime[0] > 0 || filters.returnArrivalTime[1] < 24)) {
-      const lastSegment = offer.itineraries[1].segments[offer.itineraries[1].segments.length - 1];
-      const arrTime = new Date(lastSegment.arrival.at);
-      const hour = arrTime.getHours();
-      if (hour < filters.returnArrivalTime[0] || hour >= filters.returnArrivalTime[1]) {
-        return false;
-      }
-    }
-
-    // Filter by duration
     if (filters.durationRange[0] > 0 || filters.durationRange[1] < 2880) {
       const duration = parseDuration(offer.itineraries[0].duration);
-      if (duration < filters.durationRange[0] || duration > filters.durationRange[1]) {
-        return false;
-      }
+      if (duration < filters.durationRange[0] || duration > filters.durationRange[1]) return false;
     }
 
-    // Filter by transit airports
     if (filters.transitAirports.length > 0) {
       const transitCodes = offer.itineraries.flatMap((it) =>
         it.segments.slice(0, -1).map((s) => s.arrival.iataCode)
@@ -135,8 +114,6 @@ function applyFilters(offers: FlightOffer[], filters: FlightFilters): FlightOffe
 
 function sortOffers(offers: FlightOffer[], sortBy: SortTabOption): FlightOffer[] {
   const sorted = [...offers];
-
-  // Calculate min/max for "best" score normalization
   const prices = sorted.map((o) => parseFloat(o.price.total));
   const durations = sorted.map((o) =>
     o.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0)
@@ -152,102 +129,88 @@ function sortOffers(offers: FlightOffer[], sortBy: SortTabOption): FlightOffer[]
       break;
     case 'fastest':
       sorted.sort((a, b) => {
-        const durationA = a.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0);
-        const durationB = b.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0);
-        return durationA - durationB;
+        const dA = a.itineraries.reduce((s, it) => s + parseDuration(it.duration), 0);
+        const dB = b.itineraries.reduce((s, it) => s + parseDuration(it.duration), 0);
+        return dA - dB;
       });
       break;
     case 'best':
-      sorted.sort((a, b) => {
-        const scoreA = calculateBestScore(a, minPrice, maxPrice, minDuration, maxDuration);
-        const scoreB = calculateBestScore(b, minPrice, maxPrice, minDuration, maxDuration);
-        return scoreA - scoreB;
-      });
+      sorted.sort((a, b) =>
+        calculateBestScore(a, minPrice, maxPrice, minDuration, maxDuration) -
+        calculateBestScore(b, minPrice, maxPrice, minDuration, maxDuration)
+      );
       break;
   }
-
   return sorted;
 }
 
 function countActiveFilters(filters: FlightFilters): number {
-  let count = 0;
-  if (filters.stops.length > 0) count++;
-  if (filters.airlines.length > 0) count++;
-  if (filters.transitAirports.length > 0) count++;
-  if (filters.priceRange[0] > 0 || filters.priceRange[1] < 10000) count++;
-  if (filters.durationRange[0] > 0 || filters.durationRange[1] < 2880) count++;
-  if (filters.outboundDepartureTime[0] > 0 || filters.outboundDepartureTime[1] < 24) count++;
-  if (filters.outboundArrivalTime[0] > 0 || filters.outboundArrivalTime[1] < 24) count++;
-  if (filters.returnDepartureTime[0] > 0 || filters.returnDepartureTime[1] < 24) count++;
-  if (filters.returnArrivalTime[0] > 0 || filters.returnArrivalTime[1] < 24) count++;
-  return count;
+  let c = 0;
+  if (filters.stops.length > 0) c++;
+  if (filters.airlines.length > 0) c++;
+  if (filters.transitAirports.length > 0) c++;
+  if (filters.priceRange[0] > 0 || filters.priceRange[1] < 10000) c++;
+  if (filters.durationRange[0] > 0 || filters.durationRange[1] < 2880) c++;
+  if (filters.outboundDepartureTime[0] > 0 || filters.outboundDepartureTime[1] < 24) c++;
+  if (filters.outboundArrivalTime[0] > 0 || filters.outboundArrivalTime[1] < 24) c++;
+  if (filters.returnDepartureTime[0] > 0 || filters.returnDepartureTime[1] < 24) c++;
+  if (filters.returnArrivalTime[0] > 0 || filters.returnArrivalTime[1] < 24) c++;
+  return c;
 }
 
 // ============================================================================
-// Mobile Search Popup Component
+// Mobile Search Popup — Full-screen overlay
 // ============================================================================
 
-interface MobileSearchPopupProps {
+function MobileSearchPopup({ isOpen, onClose, onSearch }: {
   isOpen: boolean;
   onClose: () => void;
   onSearch: () => void;
-}
-
-function MobileSearchPopup({ isOpen, onClose, onSearch }: MobileSearchPopupProps) {
+}) {
   useBodyScrollLock(isOpen);
-
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden"
         onClick={onClose}
-        role="presentation"
-        aria-hidden="true"
       />
-
-      {/* Popup Container */}
-      <div 
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="fixed inset-0 z-50 overflow-y-auto lg:hidden"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="search-dialog-title"
       >
-        <div className="flex min-h-full items-start justify-center p-4 sm:p-6 md:p-8">
+        <div className="flex min-h-full items-start justify-center p-4 sm:p-6">
           <div className="w-full max-w-4xl rounded-2xl bg-background shadow-2xl my-8">
-            {/* Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border px-6 py-4 rounded-t-2xl">
-              <h2 id="search-dialog-title" className="text-lg font-semibold">
-                Suche anpassen
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                aria-label="Suche schließen"
-              >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border px-6 py-4 rounded-t-2xl bg-background">
+              <h2 className="text-lg font-bold">Suche anpassen</h2>
+              <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
                 <X className="h-5 w-5" />
               </Button>
             </div>
-
-            {/* Search Form */}
             <div className="p-6 pb-48">
               <SearchForm onSearch={onSearch} />
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }
 
 // ============================================================================
-// Mobile Filter Sheet Component
+// Mobile Filter Bottom Sheet
 // ============================================================================
 
-interface MobileFilterSheetProps {
+function MobileFilterSheet({ isOpen, onClose, offers, filters, onFiltersChange, resultCount, activeFilterCount }: {
   isOpen: boolean;
   onClose: () => void;
   offers: FlightOffer[];
@@ -255,95 +218,83 @@ interface MobileFilterSheetProps {
   onFiltersChange: (filters: FlightFilters) => void;
   resultCount: number;
   activeFilterCount: number;
-}
-
-function MobileFilterSheet({
-  isOpen,
-  onClose,
-  offers,
-  filters,
-  onFiltersChange,
-  resultCount,
-  activeFilterCount,
-}: MobileFilterSheetProps) {
+}) {
   useBodyScrollLock(isOpen);
-
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden"
         onClick={onClose}
-        role="presentation"
-        aria-hidden="true"
       />
-
-      {/* Filter Sheet */}
-      <div 
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="fixed inset-x-0 bottom-0 z-50 lg:hidden"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="filter-dialog-title"
       >
-        <div className="flex max-h-[85vh] flex-col rounded-t-2xl bg-background shadow-2xl">
+        <div className="flex max-h-[90vh] flex-col rounded-t-3xl bg-background shadow-2xl">
+          {/* Handle */}
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="h-1 w-10 rounded-full bg-muted-foreground/20" />
+          </div>
+
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between px-5 py-3">
             <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-              <span id="filter-dialog-title" className="font-semibold">Filter</span>
+              <SlidersHorizontal className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              <span className="font-bold text-base">Filter</span>
               {activeFilterCount > 0 && (
-                <Badge variant="default">{activeFilterCount}</Badge>
+                <Badge className="bg-pink-500 text-white border-0 text-[10px]">{activeFilterCount}</Badge>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              aria-label="Filter schließen"
-            >
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
               <X className="h-5 w-5" />
             </Button>
           </div>
 
-          {/* Filter Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-5 pb-4">
             <FilterSidebar
               offers={offers}
               filters={filters}
               onFiltersChange={onFiltersChange}
-              className="border-0 p-0"
+              className="border-0 shadow-none p-0"
             />
           </div>
 
-          {/* Footer with Apply Button */}
-          <div className="shrink-0 border-t border-border p-4">
+          {/* Footer */}
+          <div className="shrink-0 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-background">
             <Button
-              className="w-full"
+              className="w-full h-12 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-base shadow-lg shadow-pink-500/20"
               onClick={onClose}
             >
-              {resultCount} Ergebnisse anzeigen
+              {resultCount} {resultCount === 1 ? 'Ergebnis' : 'Ergebnisse'} anzeigen
             </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }
 
 // ============================================================================
-// Desktop Search Bar Component
+// Desktop Inline Search Bar
 // ============================================================================
 
-interface DesktopSearchBarProps {
+function DesktopSearchBar({ onSearch, isSearchPending }: {
   onSearch: () => void;
   isSearchPending: boolean;
-}
-
-function DesktopSearchBar({ onSearch, isSearchPending }: DesktopSearchBarProps) {
+}) {
   const store = useSearchStore();
-  
+
   const dateRangeValue = useMemo<DateRange | undefined>(() => ({
     from: store.departureDate ?? undefined,
     to: store.returnDate ?? undefined,
@@ -354,55 +305,35 @@ function DesktopSearchBar({ onSearch, isSearchPending }: DesktopSearchBarProps) 
     store.setReturnDate(range?.to);
   }, [store]);
 
-  const handleSwapLocations = useCallback(() => {
-    store.swapLocations();
-  }, [store]);
-
-  const isSearchDisabled = isSearchPending || !store.origin || !store.destination || !store.departureDate;
+  const isDisabled = isSearchPending || !store.origin || !store.destination || !store.departureDate;
 
   return (
-    <div className="hidden lg:flex flex-1 items-center rounded-xl border border-border bg-muted/50 p-1.5 gap-1">
-      {/* Origin */}
+    <div className="hidden lg:flex flex-1 items-center rounded-2xl border border-border bg-card shadow-sm p-1.5 gap-1">
       <AirportCombobox
         value={store.origin}
         valueName={store.originName}
-        onChange={(code, name) => {
-          store.setOrigin(code);
-          store.setOriginName(name);
-        }}
+        onChange={(code, name) => { store.setOrigin(code); store.setOriginName(name); }}
         placeholder="Von"
         compact
         className="flex-1"
       />
-
-      {/* Swap button */}
       <Button
         variant="ghost"
         size="icon"
-        className="shrink-0 h-7 w-7 rounded-full hover:bg-background transition-all"
-        onClick={handleSwapLocations}
-        aria-label="Abflug- und Zielflughafen tauschen"
+        className="shrink-0 h-7 w-7 rounded-full"
+        onClick={() => store.swapLocations()}
       >
-        <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        <ArrowRightLeft className="h-3.5 w-3.5" />
       </Button>
-
-      {/* Destination */}
       <AirportCombobox
         value={store.destination}
         valueName={store.destinationName}
-        onChange={(code, name) => {
-          store.setDestination(code);
-          store.setDestinationName(name);
-        }}
+        onChange={(code, name) => { store.setDestination(code); store.setDestinationName(name); }}
         placeholder="Nach"
         compact
         className="flex-1"
       />
-
-      {/* Divider */}
-      <div className="h-7 w-px bg-border shrink-0" aria-hidden="true" />
-
-      {/* Date Range */}
+      <div className="h-7 w-px bg-border shrink-0" />
       {store.tripType === 'oneway' ? (
         <SingleFlightDatePicker
           value={store.departureDate ?? undefined}
@@ -421,101 +352,76 @@ function DesktopSearchBar({ onSearch, isSearchPending }: DesktopSearchBarProps) 
           className="flex-1"
         />
       )}
-
-      {/* Divider */}
-      <div className="h-7 w-px bg-border shrink-0" aria-hidden="true" />
-
-      {/* Passengers */}
+      <div className="h-7 w-px bg-border shrink-0" />
       <PassengerSelector
-        value={{
-          adults: store.adults,
-          children: store.children,
-          infants: store.infants,
-        }}
-        onChange={(passengers) => {
-          store.setAdults(passengers.adults);
-          store.setChildren(passengers.children);
-          store.setInfants(passengers.infants);
-        }}
+        value={{ adults: store.adults, children: store.children, infants: store.infants }}
+        onChange={(p) => { store.setAdults(p.adults); store.setChildren(p.children); store.setInfants(p.infants); }}
         compact
         className="shrink-0"
       />
-
-      {/* Divider */}
-      <div className="h-7 w-px bg-border shrink-0" aria-hidden="true" />
-
-      {/* Cabin Class */}
+      <div className="h-7 w-px bg-border shrink-0" />
       <CabinClassSelect
         value={store.travelClass}
-        onChange={(value) => store.setTravelClass(value)}
+        onChange={(v) => store.setTravelClass(v)}
         compact
         className="shrink-0"
       />
-
-      {/* Search button */}
       <Button
         size="sm"
-        className="shrink-0 gap-1.5 rounded-lg"
+        className="shrink-0 gap-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white"
         onClick={onSearch}
-        disabled={isSearchDisabled}
-        aria-label="Flüge suchen"
+        disabled={isDisabled}
       >
-        <Search className="h-4 w-4" aria-hidden="true" />
+        <Search className="h-4 w-4" />
       </Button>
     </div>
   );
 }
 
 // ============================================================================
-// Mobile Search Summary Component
+// Mobile Search Summary — compact, tappable
 // ============================================================================
 
-interface MobileSearchSummaryProps {
-  onClick: () => void;
-}
-
-function MobileSearchSummary({ onClick }: MobileSearchSummaryProps) {
+function MobileSearchSummary({ onClick }: { onClick: () => void }) {
   const { origin, destination, originName, destinationName, departureDate, returnDate, adults, children, infants, travelClass } = useSearchStore();
-  
   const passengerCount = getPassengerCount(adults, children, infants);
   const cabinLabel = travelClass?.toLowerCase() || 'economy';
 
   return (
     <button
       onClick={onClick}
-      className="flex flex-1 flex-col gap-1.5 rounded-xl border border-border bg-muted/50 px-3 py-2 text-left transition-all hover:bg-muted lg:hidden overflow-hidden"
-      aria-label="Suche anpassen"
+      className="flex flex-1 flex-col gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-left transition-all hover:shadow-md active:scale-[0.99] lg:hidden overflow-hidden"
     >
-      {/* Top Row: Route and Edit Icon */}
+      {/* Route */}
       <div className="flex items-center gap-2 w-full">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <PlaneIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="text-sm font-medium truncate">
+          <PlaneIcon className="h-4 w-4 shrink-0 text-gray-500" />
+          <span className="text-sm font-bold truncate">
             {originName || formatAirportName(origin) || '???'} → {destinationName || formatAirportName(destination) || '???'}
           </span>
         </div>
-        <Edit2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <Edit2 className="h-4 w-4 shrink-0 text-muted-foreground" />
       </div>
 
-      {/* Bottom Row: Dates, Passengers, and Cabin Class */}
+      {/* Meta */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {departureDate && (
           <>
             <div className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+              <Calendar className="h-3.5 w-3.5" />
               <span>
                 {formatSearchDate(departureDate)}
-                {returnDate && ` - ${formatSearchDate(returnDate)}`}
+                {returnDate && ` – ${formatSearchDate(returnDate)}`}
               </span>
             </div>
-            <div className="h-3 w-px bg-border" aria-hidden="true" />
+            <div className="h-3 w-px bg-border" />
           </>
         )}
         <div className="flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" aria-hidden="true" />
+          <Users className="h-3.5 w-3.5" />
           <span>{passengerCount}</span>
         </div>
-        <div className="h-3 w-px bg-border" aria-hidden="true" />
+        <div className="h-3 w-px bg-border" />
         <span className="capitalize">{cabinLabel}</span>
       </div>
     </button>
@@ -523,7 +429,7 @@ function MobileSearchSummary({ onClick }: MobileSearchSummaryProps) {
 }
 
 // ============================================================================
-// Results Page Content
+// Results Content
 // ============================================================================
 
 function ResultsContent() {
@@ -533,26 +439,21 @@ function ResultsContent() {
   const { setSelectedOffer: setBookingOffer, reset: resetBooking } = useBookingStore();
   const { mutate: searchFlights, isPending: isSearchPending } = useFlightSearch();
 
-  // UI State
   const [showSearchForm, setShowSearchForm] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortTabOption>('best');
   const [filters, setFilters] = useState<FlightFilters>(DEFAULT_FILTERS);
   const [selectedOfferId, setSelectedOfferId] = useState<string>();
 
-  // Memoized calculations
   const filteredOffers = useMemo(() => applyFilters(searchResults, filters), [searchResults, filters]);
   const sortedOffers = useMemo(() => sortOffers(filteredOffers, sortBy), [filteredOffers, sortBy]);
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
-  // Handlers
   const handleSearch = useCallback(() => {
     const request = store.getSearchRequest();
     if (!request) return;
     searchFlights(request, {
-      onSuccess: (data) => {
-        store.setSearchResults(data.data);
-      },
+      onSuccess: (data) => store.setSearchResults(data.data),
     });
     setShowSearchForm(false);
   }, [store, searchFlights]);
@@ -565,47 +466,40 @@ function ResultsContent() {
     router.push('/booking');
   }, [router, store, setBookingOffer, resetBooking]);
 
-  const handleOpenSearchForm = useCallback(() => setShowSearchForm(true), []);
-  const handleCloseSearchForm = useCallback(() => setShowSearchForm(false), []);
-  const handleOpenFilters = useCallback(() => setShowFilters(true), []);
-  const handleCloseFilters = useCallback(() => setShowFilters(false), []);
-
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Skip to main content link for accessibility */}
-      <a
-        href="#results-main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4 focus:text-foreground"
-      >
+      {/* Skip link */}
+      <a href="#results-main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">
         Zum Hauptinhalt springen
       </a>
 
-      {/* Compact Search Header */}
-      <header className="sticky top-0 z-40 bg-background border-b border-border shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-3">
+      {/* === STICKY SEARCH HEADER === */}
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm" role="search" aria-label="Flugsuche">
+        <div className="mx-auto max-w-7xl px-4 py-2">
           <div className="flex items-center gap-3">
-            {/* Mobile: Search Summary */}
-            <MobileSearchSummary onClick={handleOpenSearchForm} />
-
-            {/* Desktop: Inline Search Bar */}
+            <MobileSearchSummary onClick={() => setShowSearchForm(true)} />
             <DesktopSearchBar onSearch={handleSearch} isSearchPending={isSearchPending} />
           </div>
         </div>
       </header>
 
       {/* Mobile Search Popup */}
-      <MobileSearchPopup
-        isOpen={showSearchForm}
-        onClose={handleCloseSearchForm}
-        onSearch={handleSearch}
-      />
+      <AnimatePresence>
+        {showSearchForm && (
+          <MobileSearchPopup
+            isOpen={showSearchForm}
+            onClose={() => setShowSearchForm(false)}
+            onSearch={handleSearch}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Content */}
+      {/* === MAIN CONTENT === */}
       <div className="flex justify-center">
-        <div className="w-full max-w-7xl px-4 py-6">
+        <div className="w-full max-w-7xl px-4 py-4 sm:py-6">
           <div className="flex gap-6">
-            {/* Sidebar */}
-            <aside className="hidden w-72 shrink-0 lg:block" aria-label="Filter">
+            {/* Desktop Sidebar */}
+            <aside className="hidden w-72 shrink-0 lg:block sticky top-[70px] self-start max-h-[calc(100vh-90px)] overflow-y-auto" aria-label="Filter">
               <FilterSidebar
                 offers={searchResults}
                 filters={filters}
@@ -613,33 +507,36 @@ function ResultsContent() {
               />
             </aside>
 
-            {/* Results */}
-            <main id="results-main" className="flex-1" aria-label="Suchergebnisse">
-              {/* Sort Tabs */}
-              <SortTabs
-                value={sortBy}
-                onChange={setSortBy}
-                offers={filteredOffers}
-                className="mb-4 rounded-lg bg-card border border-border overflow-hidden"
-              />
+            {/* Results Column */}
+            <main id="results-main" className="flex-1 min-w-0" aria-label="Suchergebnisse">
+              {/* Sort Tabs — sticky below header */}
+              <div className="sticky top-[53px] sm:top-[57px] z-30 -mx-4 px-4 pt-1 pb-3 bg-muted/30 backdrop-blur-sm">
+                <SortTabs
+                  value={sortBy}
+                  onChange={setSortBy}
+                  offers={filteredOffers}
+                  className="rounded-xl bg-card border border-border shadow-sm overflow-hidden"
+                />
 
-              {/* Mobile Filter Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenFilters}
-                className="lg:hidden mb-4 w-full gap-2"
-                aria-label={`Filter öffnen${activeFilterCount > 0 ? `, ${activeFilterCount} aktive Filter` : ''}`}
-              >
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                <span>Filter</span>
-                {activeFilterCount > 0 && (
-                  <Badge variant="default" className="ml-1">
-                    {activeFilterCount}
-                  </Badge>
-                )}
-              </Button>
+                {/* Mobile Filter Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(true)}
+                  className="lg:hidden mt-3 w-full gap-2 rounded-xl h-11 font-semibold border-border hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.99] transition-all"
+                >
+                  <SlidersHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <span>Filter</span>
+                  {activeFilterCount > 0 && (
+                    <Badge className="bg-pink-500 text-white border-0 text-[10px] px-1.5">{activeFilterCount}</Badge>
+                  )}
+                  {filteredOffers.length > 0 && activeFilterCount === 0 && (
+                    <span className="text-xs text-muted-foreground ml-auto">{filteredOffers.length} Ergebnisse</span>
+                  )}
+                </Button>
+              </div>
 
+              {/* Flight List */}
               <FlightList
                 offers={sortedOffers}
                 isLoading={isSearching}
@@ -652,21 +549,25 @@ function ResultsContent() {
       </div>
 
       {/* Mobile Filter Sheet */}
-      <MobileFilterSheet
-        isOpen={showFilters}
-        onClose={handleCloseFilters}
-        offers={searchResults}
-        filters={filters}
-        onFiltersChange={setFilters}
-        resultCount={filteredOffers.length}
-        activeFilterCount={activeFilterCount}
-      />
+      <AnimatePresence>
+        {showFilters && (
+          <MobileFilterSheet
+            isOpen={showFilters}
+            onClose={() => setShowFilters(false)}
+            offers={searchResults}
+            filters={filters}
+            onFiltersChange={setFilters}
+            resultCount={filteredOffers.length}
+            activeFilterCount={activeFilterCount}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 // ============================================================================
-// Results Page
+// Page Export
 // ============================================================================
 
 export default function ResultsPage() {
@@ -675,14 +576,14 @@ export default function ResultsPage() {
       <Suspense
         fallback={
           <div className="mx-auto max-w-7xl px-4 py-6 space-y-4">
-            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full rounded-2xl" />
             <div className="flex gap-6">
-              <Skeleton className="hidden lg:block w-72 h-96 shrink-0" />
-              <div className="flex-1 space-y-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
+              <Skeleton className="hidden lg:block w-72 h-96 shrink-0 rounded-2xl" />
+              <div className="flex-1 space-y-3">
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-32 w-full rounded-2xl" />
+                <Skeleton className="h-32 w-full rounded-2xl" />
+                <Skeleton className="h-32 w-full rounded-2xl" />
               </div>
             </div>
           </div>

@@ -91,6 +91,64 @@ export function getAmenityIcon(amenityType?: string, description?: string) {
  * Formats a branded fare name to be more user-friendly.
  * Amadeus brandedFareLabel often contains technical or shortened names.
  */
+/**
+ * Feature availability status for fare inference.
+ * 'included' = free, 'chargeable' = against fee, 'not-available' = not possible
+ */
+export type FareFeatureStatus = 'included' | 'chargeable' | 'not-available';
+
+export interface InferredFareFeatures {
+    seatSelection: FareFeatureStatus;
+    changeable: FareFeatureStatus;
+    refundable: FareFeatureStatus;
+}
+
+/**
+ * Infers fare features from the branded fare name when amenities data is empty.
+ * Differentiates between included (free), chargeable (fee), and not available.
+ */
+export function inferFareFeatures(brandedFare: string): InferredFareFeatures {
+    const upper = (brandedFare || '').toUpperCase().replace(/[\s_-]/g, '');
+    
+    // Tier detection — order matters (most specific first)
+    const isFullFlex = /FULLFLEX|FULLFLX|FF$|DELUXE/.test(upper);
+    const isFlex = !isFullFlex && /FLEX|FLX|FX$|COMFORT|PLUS/.test(upper);
+    const isPremiumCabin = /BUSINESS|BUS|BIZ|FIRST|FST|ELITE/.test(upper);
+    const isStandard = /STANDARD|STD|CLASSIC|VALUE|SMART|SV$|ST$/.test(upper);
+    const isLight = /LIGHT|LGT|BASIC|PROMO|SAVER/.test(upper);
+    
+    // First Class / Business Full Flex
+    if (isPremiumCabin && isFullFlex) {
+        return { seatSelection: 'included', changeable: 'included', refundable: 'included' };
+    }
+    // Business Flex
+    if (isPremiumCabin && isFlex) {
+        return { seatSelection: 'included', changeable: 'included', refundable: 'chargeable' };
+    }
+    // Business Standard
+    if (isPremiumCabin) {
+        return { seatSelection: 'included', changeable: 'chargeable', refundable: 'chargeable' };
+    }
+    // Economy Full Flex
+    if (isFullFlex) {
+        return { seatSelection: 'included', changeable: 'included', refundable: 'included' };
+    }
+    // Economy Flex
+    if (isFlex) {
+        return { seatSelection: 'included', changeable: 'included', refundable: 'chargeable' };
+    }
+    // Economy Standard
+    if (isStandard) {
+        return { seatSelection: 'chargeable', changeable: 'chargeable', refundable: 'not-available' };
+    }
+    // Economy Light / Basic / Saver
+    if (isLight) {
+        return { seatSelection: 'chargeable', changeable: 'not-available', refundable: 'not-available' };
+    }
+    // Unknown → assume standard-ish
+    return { seatSelection: 'chargeable', changeable: 'chargeable', refundable: 'not-available' };
+}
+
 export function formatBrandedFareName(name: string): string {
     if (!name) return '';
 
@@ -98,6 +156,17 @@ export function formatBrandedFareName(name: string): string {
 
     // 1. Direct high-priority mappings
     const directMappings: Record<string, string> = {
+        // Short fare codes (common in Amadeus test/prod)
+        'ECONOMYST': 'Economy Standard',
+        'ECONOMYFX': 'Economy Flex',
+        'ECONOMYFF': 'Economy Full Flex',
+        'ECONOMYSV': 'Economy Saver',
+        'ECONOMYLGT': 'Economy Light',
+        'BUSINESSST': 'Business Standard',
+        'BUSINESSFX': 'Business Flex',
+        'BUSINESSFF': 'Business Full Flex',
+        'PREMIUMST': 'Premium Economy Standard',
+        'PREMIUMFX': 'Premium Economy Flex',
         'ECOGREIC': 'Economy Green',
         'PREBASE': 'Premium Economy Base',
         'PREGREIC': 'Premium Economy Green',

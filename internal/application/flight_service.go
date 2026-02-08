@@ -14,6 +14,7 @@ import (
 type FlightService struct {
 	searcher   domain.FlightSearcher
 	booker     domain.FlightBooker
+	upseller   domain.UpsellProvider
 	cache      domain.FlightCache
 	indexer    domain.FlightIndexer
 	coalescer  domain.RequestCoalescer
@@ -32,6 +33,7 @@ type FlightServiceConfig struct {
 func NewFlightService(
 	searcher domain.FlightSearcher,
 	booker domain.FlightBooker,
+	upseller domain.UpsellProvider,
 	cache domain.FlightCache,
 	indexer domain.FlightIndexer,
 	coalescer domain.RequestCoalescer,
@@ -46,6 +48,7 @@ func NewFlightService(
 	return &FlightService{
 		searcher:  searcher,
 		booker:    booker,
+		upseller:  upseller,
 		cache:     cache,
 		indexer:   indexer,
 		coalescer: coalescer,
@@ -192,6 +195,33 @@ func (s *FlightService) PriceFlights(ctx context.Context, offers []domain.Flight
 	
 	s.metrics.ObserveAPILatency("amadeus", "pricing", float64(time.Since(startTime).Milliseconds()))
 	
+	return response, nil
+}
+
+// UpsellFlights gets branded fare / upsell options for selected offers
+func (s *FlightService) UpsellFlights(ctx context.Context, offers []domain.FlightOffer) (*domain.FlightSearchResponse, error) {
+	startTime := time.Now()
+
+	s.logger.InfoContext(ctx, "getting upsell offers",
+		slog.Int("offerCount", len(offers)),
+	)
+
+	if s.upseller == nil {
+		return nil, fmt.Errorf("upsell provider not available")
+	}
+
+	response, err := s.upseller.GetUpsellOffers(ctx, offers)
+	if err != nil {
+		s.metrics.IncrementAPIErrors("upsell", categorizeError(err))
+		return nil, fmt.Errorf("upsell request failed: %w", err)
+	}
+
+	s.metrics.ObserveAPILatency("amadeus", "upsell", float64(time.Since(startTime).Milliseconds()))
+
+	s.logger.InfoContext(ctx, "upsell offers retrieved",
+		slog.Int("resultCount", len(response.Data)),
+	)
+
 	return response, nil
 }
 

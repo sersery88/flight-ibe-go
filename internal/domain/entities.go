@@ -7,6 +7,7 @@ import (
 
 // FlightOffer represents a flight offer in our domain
 type FlightOffer struct {
+	Type                  string            `json:"type,omitempty"`
 	ID                    string            `json:"id"`
 	Source                string            `json:"source"`
 	InstantTicketing      bool              `json:"instantTicketingRequired"`
@@ -228,4 +229,147 @@ type BookingRequest struct {
 	FlightOffers []FlightOffer `json:"flightOffers"`
 	Travelers    []Traveler    `json:"travelers"`
 	Contacts     []Contact     `json:"contacts"`
+}
+
+// ---- Seatmap Domain Models ----
+
+// SeatmapResponse is the top-level response from the Amadeus SeatMap API
+type SeatmapResponse struct {
+	Data         []SeatmapData        `json:"data"`
+	Dictionaries *SeatmapDictionaries `json:"dictionaries,omitempty"`
+}
+
+// SeatmapDictionaries contains lookup tables for facility and seat characteristic codes
+type SeatmapDictionaries struct {
+	Facility map[string]string `json:"facility,omitempty"`
+	Seat     map[string]string `json:"seatCharacteristic,omitempty"`
+}
+
+// SeatmapData contains seatmap information for a single flight segment
+type SeatmapData struct {
+	Type                   string                  `json:"type"`
+	ID                     string                  `json:"id"`
+	FlightOfferID          string                  `json:"flightOfferId,omitempty"`
+	SegmentID              string                  `json:"segmentId,omitempty"`
+	Departure              FlightEndpoint          `json:"departure"`
+	Arrival                FlightEndpoint          `json:"arrival"`
+	CarrierCode            string                  `json:"carrierCode"`
+	Number                 string                  `json:"number"`
+	Operating              *OperatingFlight        `json:"operating,omitempty"`
+	Aircraft               Aircraft                `json:"aircraft"`
+	Class                  string                  `json:"class,omitempty"`
+	Decks                  []Deck                  `json:"decks"`
+	AircraftCabinAmenities *AircraftCabinAmenities `json:"aircraftCabinAmenities,omitempty"`
+	AvailableSeatsCounters []AvailableSeatsCounter `json:"availableSeatsCounters,omitempty"`
+}
+
+// OperatingFlight represents the operating carrier (for codeshares)
+type OperatingFlight struct {
+	CarrierCode string `json:"carrierCode"`
+}
+
+// Deck represents an aircraft deck (MAIN, UPPER, LOWER)
+type Deck struct {
+	DeckType          string            `json:"deckType"`
+	DeckConfiguration DeckConfiguration `json:"deckConfiguration"`
+	Facilities        []Facility        `json:"facilities,omitempty"`
+	Seats             []Seat            `json:"seats"`
+}
+
+// DeckConfiguration describes the physical dimensions and layout of a deck
+type DeckConfiguration struct {
+	Width         int   `json:"width"`
+	Length        int   `json:"length"`
+	StartSeatRow  int   `json:"startSeatRow"`
+	EndSeatRow    int   `json:"endSeatRow"`
+	StartWingsX   int   `json:"startWingsX,omitempty"`
+	EndWingsX     int   `json:"endWingsX,omitempty"`
+	StartWingsRow int   `json:"startWingsRow,omitempty"`
+	EndWingsRow   int   `json:"endWingsRow,omitempty"`
+	ExitRowsX     []int `json:"exitRowsX,omitempty"`
+}
+
+// Facility represents an on-board facility (lavatory, galley, closet, stairs, bar, etc.)
+type Facility struct {
+	Code        string      `json:"code"`
+	Column      string      `json:"column,omitempty"`
+	Row         string      `json:"row,omitempty"`
+	Position    string      `json:"position,omitempty"`
+	Coordinates Coordinates `json:"coordinates"`
+}
+
+// Seat represents a single seat with pricing and characteristics
+type Seat struct {
+	Cabin                string                `json:"cabin"`
+	Number               string                `json:"number"`
+	CharacteristicsCodes []string              `json:"characteristicsCodes,omitempty"`
+	TravelerPricing      []SeatTravelerPricing `json:"travelerPricing,omitempty"`
+	Coordinates          Coordinates           `json:"coordinates"`
+}
+
+// Coordinates represents grid coordinates for seats and facilities
+type Coordinates struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+// SeatTravelerPricing contains availability and price for a specific traveler
+type SeatTravelerPricing struct {
+	TravelerID             string `json:"travelerId"`
+	SeatAvailabilityStatus string `json:"seatAvailabilityStatus"`
+	Price                  *Price `json:"price,omitempty"`
+}
+
+// AircraftCabinAmenities describes amenities available in the cabin
+type AircraftCabinAmenities struct {
+	Power         *AmenityPower          `json:"power,omitempty"`
+	Seat          *AmenitySeat           `json:"seat,omitempty"`
+	Wifi          *AmenityWifi           `json:"wifi,omitempty"`
+	Entertainment []AmenityEntertainment `json:"entertainment,omitempty"`
+	Food          *AmenityFood           `json:"food,omitempty"`
+	Beverage      *AmenityBeverage       `json:"beverage,omitempty"`
+}
+
+// AmenityPower describes power outlet availability
+type AmenityPower struct {
+	IsChargeable bool   `json:"isChargeable,omitempty"`
+	PowerType    string `json:"powerType,omitempty"`
+	USBType      string `json:"usbType,omitempty"`
+}
+
+// AmenitySeat describes seat physical characteristics
+type AmenitySeat struct {
+	LegSpace  int    `json:"legSpace,omitempty"`
+	SpaceUnit string `json:"spaceUnit,omitempty"`
+	Tilt      string `json:"tilt,omitempty"`
+}
+
+// AmenityWifi describes wifi availability
+type AmenityWifi struct {
+	IsChargeable bool   `json:"isChargeable,omitempty"`
+	WifiCoverage string `json:"wifiCoverage,omitempty"`
+}
+
+// AmenityEntertainment describes entertainment options
+type AmenityEntertainment struct {
+	IsChargeable      bool   `json:"isChargeable,omitempty"`
+	EntertainmentType string `json:"entertainmentType,omitempty"`
+}
+
+// AmenityFood describes food service
+type AmenityFood struct {
+	IsChargeable bool   `json:"isChargeable,omitempty"`
+	FoodType     string `json:"foodType,omitempty"`
+}
+
+// AmenityBeverage describes beverage service
+type AmenityBeverage struct {
+	IsChargeable  bool   `json:"isChargeable,omitempty"`
+	BeverageType  string `json:"beverageType,omitempty"`
+}
+
+// AvailableSeatsCounter counts available seats per traveler
+type AvailableSeatsCounter struct {
+	TravelerID string `json:"travelerId"`
+	Value      int    `json:"value"`
 }

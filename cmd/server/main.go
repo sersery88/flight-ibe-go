@@ -121,6 +121,7 @@ func run(logger *slog.Logger) error {
 	flightService := application.NewFlightService(
 		amadeusAdapter,  // FlightSearcher
 		amadeusAdapter,  // FlightBooker
+		amadeusAdapter,  // UpsellProvider
 		flightCache,     // FlightCache
 		nil,             // FlightIndexer (optional, for OpenSearch)
 		coalescer,       // RequestCoalescer
@@ -139,8 +140,10 @@ func run(logger *slog.Logger) error {
 
 	// Create HTTP router
 	router := httpHandler.NewRouter(httpHandler.RouterConfig{
-		FlightService:  flightService,
-		HealthChecks:   healthChecks,
+		FlightService:    flightService,
+		LocationSearcher: amadeusAdapter,
+		SeatmapProvider:  amadeusAdapter,
+		HealthChecks:     healthChecks,
 		RateLimitRPS:   config.RateLimitRPS,
 		RateLimitBurst: config.RateLimitBurst,
 		AllowedOrigins: config.AllowedOrigins,

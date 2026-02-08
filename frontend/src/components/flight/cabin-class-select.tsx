@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TravelClass } from '@/types/flight';
 import {
@@ -13,7 +12,7 @@ import {
 } from '@/components/ui/select';
 
 // ============================================================================
-// Cabin Class Select Component - Using Base UI Select
+// Cabin Class Select — Premium Dropdown
 // ============================================================================
 
 interface CabinClassSelectProps {
@@ -24,11 +23,11 @@ interface CabinClassSelectProps {
   compact?: boolean;
 }
 
-const CABIN_CLASSES: { value: TravelClass; label: string }[] = [
-  { value: 'ECONOMY', label: 'Economy' },
-  { value: 'PREMIUM_ECONOMY', label: 'Premium Economy' },
-  { value: 'BUSINESS', label: 'Business Class' },
-  { value: 'FIRST', label: 'First Class' },
+const CABIN_CLASSES: { value: TravelClass; label: string; shortLabel: string }[] = [
+  { value: 'ECONOMY', label: 'Economy', shortLabel: 'Economy' },
+  { value: 'PREMIUM_ECONOMY', label: 'Premium Economy', shortLabel: 'Prem. Eco' },
+  { value: 'BUSINESS', label: 'Business Class', shortLabel: 'Business' },
+  { value: 'FIRST', label: 'First Class', shortLabel: 'First' },
 ];
 
 export function CabinClassSelect({
@@ -52,21 +51,22 @@ export function CabinClassSelect({
         <SelectTrigger
           size={compact ? 'sm' : 'default'}
           className={cn(
-            'w-[175px]',
+            'min-h-[44px] cursor-pointer',
             compact
-              ? 'border-0 bg-background/60 hover:bg-background hover:shadow-sm focus:bg-background focus:shadow-md'
-              : ''
+              ? 'w-auto border-0 bg-white/80 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-md dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'w-full'
           )}
         >
           <SelectValue placeholder="Klasse wählen">
-            {selectedCabin.label}
+            <span className="sm:hidden">{selectedCabin.shortLabel}</span>
+            <span className="hidden sm:inline">{selectedCabin.label}</span>
           </SelectValue>
         </SelectTrigger>
 
         <SelectPositioner>
           <SelectContent>
             {CABIN_CLASSES.map((cabin) => (
-              <SelectItem key={cabin.value} value={cabin.value}>
+              <SelectItem key={cabin.value} value={cabin.value} className="min-h-[44px]">
                 {cabin.label}
               </SelectItem>
             ))}

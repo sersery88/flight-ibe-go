@@ -271,6 +271,37 @@ func (a *Adapter) PriceOffers(ctx context.Context, offers []domain.FlightOffer) 
 	return &resp, nil
 }
 
+// GetUpsellOffers implements domain.UpsellProvider
+func (a *Adapter) GetUpsellOffers(ctx context.Context, offers []domain.FlightOffer) (*domain.FlightSearchResponse, error) {
+	// Amadeus requires "type": "flight-offer" on each offer
+	for i := range offers {
+		offers[i].Type = "flight-offer"
+	}
+	reqBody := map[string]interface{}{
+		"data": map[string]interface{}{
+			"type":         "flight-offers-upselling",
+			"flightOffers": offers,
+		},
+	}
+
+	body, err := a.doRequest(ctx, "POST", "/v1/shopping/flight-offers/upselling", reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp domain.FlightSearchResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse upsell response: %w", err)
+	}
+
+	// Enrich offers with derived fields
+	for i := range resp.Data {
+		enrichFlightOffer(&resp.Data[i])
+	}
+
+	return &resp, nil
+}
+
 // CreateOrder implements domain.FlightBooker
 func (a *Adapter) CreateOrder(ctx context.Context, req domain.BookingRequest) (*domain.FlightOrder, error) {
 	reqBody := map[string]interface{}{
@@ -320,6 +351,30 @@ func (a *Adapter) CancelOrder(ctx context.Context, orderID string) error {
 	path := fmt.Sprintf("/v1/booking/flight-orders/%s", orderID)
 	_, err := a.doRequest(ctx, "DELETE", path, nil)
 	return err
+}
+
+// GetSeatmap implements domain.SeatmapProvider
+func (a *Adapter) GetSeatmap(ctx context.Context, offers []domain.FlightOffer) (*domain.SeatmapResponse, error) {
+	// Amadeus requires "type": "flight-offer" on each offer
+	for i := range offers {
+		offers[i].Type = "flight-offer"
+	}
+
+	reqBody := map[string]interface{}{
+		"data": offers,
+	}
+
+	body, err := a.doRequest(ctx, "POST", "/v1/shopping/seatmaps", reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("seatmap request failed: %w", err)
+	}
+
+	var resp domain.SeatmapResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse seatmap response: %w", err)
+	}
+
+	return &resp, nil
 }
 
 // SearchLocations implements domain.LocationSearcher

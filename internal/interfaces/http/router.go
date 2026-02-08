@@ -17,7 +17,9 @@ import (
 // RouterConfig contains router configuration
 type RouterConfig struct {
 	// Service dependencies
-	FlightService *application.FlightService
+	FlightService    *application.FlightService
+	LocationSearcher domain.LocationSearcher
+	SeatmapProvider  domain.SeatmapProvider
 	
 	// Health checks
 	HealthChecks []domain.HealthChecker
@@ -95,7 +97,14 @@ func NewRouter(config RouterConfig) *gin.Engine {
 
 	// API routes
 	flightHandler := NewFlightHandler(config.FlightService, config.Logger)
-	
+	locationHandler := NewLocationHandler(config.LocationSearcher, config.Logger)
+
+	// Seatmap handler (optional — only registered if provider is available)
+	var seatmapHandler *SeatmapHandler
+	if config.SeatmapProvider != nil {
+		seatmapHandler = NewSeatmapHandler(config.SeatmapProvider, config.Logger)
+	}
+
 	// API v1
 	v1 := router.Group("/api/v1")
 	{
@@ -104,10 +113,15 @@ func NewRouter(config RouterConfig) *gin.Engine {
 			flights.POST("/search", flightHandler.SearchFlights)
 			flights.POST("/filter", flightHandler.FilterFlights)
 			flights.POST("/price", flightHandler.PriceFlights)
+			flights.POST("/upsell", flightHandler.UpsellFlights)
 			flights.POST("/book", flightHandler.CreateBooking)
 			flights.GET("/orders/:id", flightHandler.GetBooking)
 			flights.DELETE("/orders/:id", flightHandler.CancelBooking)
+			if seatmapHandler != nil {
+				flights.POST("/seatmap", seatmapHandler.GetSeatmap)
+			}
 		}
+		v1.GET("/locations", locationHandler.SearchLocations)
 	}
 
 	// Legacy API routes (for backward compatibility)
@@ -117,11 +131,20 @@ func NewRouter(config RouterConfig) *gin.Engine {
 		{
 			flights.POST("/search", flightHandler.SearchFlights)
 			flights.POST("/price", flightHandler.PriceFlights)
+			flights.POST("/upsell", flightHandler.UpsellFlights)
 			flights.POST("/book", flightHandler.CreateBooking)
 			flights.GET("/orders/:id", flightHandler.GetBooking)
 			flights.DELETE("/orders/:id", flightHandler.CancelBooking)
+			if seatmapHandler != nil {
+				flights.POST("/seatmap", seatmapHandler.GetSeatmap)
+			}
 		}
+		api.GET("/locations", locationHandler.SearchLocations)
 	}
+
+	// Root-level endpoints (frontend calls without /api prefix)
+	router.GET("/locations", locationHandler.SearchLocations)
+	router.POST("/flights/upsell", flightHandler.UpsellFlights)
 
 	return router
 }

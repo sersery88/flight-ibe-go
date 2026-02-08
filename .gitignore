@@ -32,3 +32,8 @@ Thumbs.db
 
 # Air (hot reload)
 tmp/
+
+frontend/.next/
+flight-backend
+
+frontend/node_modules/

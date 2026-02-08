@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Flypink - Finden Sie Ihren perfekten Flug",
-  description: "Vergleichen Sie Preise von über 400 Airlines weltweit",
+  title: "Flypink — Finde deinen perfekten Flug",
+  description: "Vergleiche Preise von über 400 Airlines weltweit. Flypink by Pink Travel AG — seit 1994.",
 };
 
 export default function RootLayout({

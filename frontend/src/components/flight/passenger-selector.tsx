@@ -2,7 +2,6 @@
 
 import { Users, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import {
   Popover,
   PopoverTrigger,
@@ -11,7 +10,7 @@ import {
 } from '@/components/ui/popover';
 
 // ============================================================================
-// Passenger Selector Component
+// Passenger Selector — Premium Stepper with Popover
 // ============================================================================
 
 export interface PassengerCount {
@@ -30,7 +29,7 @@ interface PassengerSelectorProps {
 
 const PASSENGER_TYPES = [
   { key: 'adults' as const, label: 'Erwachsene', description: 'Ab 12 Jahren', min: 1, max: 9 },
-  { key: 'children' as const, label: 'Kinder', description: '2-11 Jahre', min: 0, max: 8 },
+  { key: 'children' as const, label: 'Kinder', description: '2–11 Jahre', min: 0, max: 8 },
   { key: 'infants' as const, label: 'Babys', description: 'Unter 2 Jahren', min: 0, max: 4 },
 ];
 
@@ -86,63 +85,73 @@ export function PassengerSelector({
       <Popover>
         <PopoverTrigger
           className={cn(
-            'flex items-center gap-2 text-left text-sm transition-all duration-150 cursor-pointer',
+            'flex items-center gap-2 text-left text-sm transition-all duration-150 cursor-pointer min-h-[44px]',
             compact
-              ? 'w-[190px] rounded-lg border-0 bg-background/60 py-3 px-3 hover:bg-background hover:shadow-sm focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/50 sm:py-2.5'
-              : 'w-full rounded-lg border border-border bg-background px-3 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20',
+              ? 'rounded-xl bg-gray-50 px-4 py-2.5 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-md focus:ring-2 focus:ring-pink-500/50 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-background px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
             'focus:outline-none'
           )}
         >
-          <Users className={cn('text-muted-foreground shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} />
-          <span className="whitespace-nowrap">{getDisplayText()}</span>
+          <Users className={cn('text-gray-400 shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} />
+          <span className="whitespace-nowrap font-medium">{getDisplayText()}</span>
         </PopoverTrigger>
 
-        <PopoverPositioner sideOffset={4}>
+        <PopoverPositioner sideOffset={8}>
           <PopoverContent
-            className={cn(
-              'z-50 w-72 rounded-xl border bg-popover p-4 shadow-xl'
-            )}
+            className="z-50 w-80 rounded-2xl border bg-popover p-5 shadow-2xl"
           >
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <h3 className="text-sm font-semibold text-foreground">Passagiere</h3>
+
               {PASSENGER_TYPES.map((type) => (
                 <div key={type.key} className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-foreground">
+                    <div className="text-sm font-medium text-foreground">
                       {type.label}
                     </div>
                     <div className="text-xs text-muted-foreground">{type.description}</div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 sm:h-8 sm:w-8"
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all',
+                        value[type.key] <= type.min
+                          ? 'border-gray-200 text-gray-300 cursor-not-allowed dark:border-gray-700 dark:text-gray-600'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 active:scale-95 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
+                      )}
                       onClick={() => updateCount(type.key, -1)}
                       disabled={value[type.key] <= type.min}
+                      aria-label={`${type.label} reduzieren`}
                     >
                       <Minus className="h-4 w-4" />
-                    </Button>
+                    </button>
 
-                    <span className="w-8 text-center font-medium">
+                    <span className="w-8 text-center text-lg font-semibold tabular-nums">
                       {value[type.key]}
                     </span>
 
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 sm:h-8 sm:w-8"
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all',
+                        value[type.key] >= type.max || totalPassengers >= 9
+                          ? 'border-gray-200 text-gray-300 cursor-not-allowed dark:border-gray-700 dark:text-gray-600'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 active:scale-95 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
+                      )}
                       onClick={() => updateCount(type.key, 1)}
                       disabled={value[type.key] >= type.max || totalPassengers >= 9}
+                      aria-label={`${type.label} erhöhen`}
                     >
                       <Plus className="h-4 w-4" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ))}
 
               <div className="border-t border-border pt-3 text-xs text-muted-foreground">
-                Maximal 9 Passagiere. Babys müssen auf dem Schoss eines Erwachsenen reisen.
+                Max. 9 Passagiere. Babys reisen auf dem Schoß eines Erwachsenen.
               </div>
             </div>
           </PopoverContent>

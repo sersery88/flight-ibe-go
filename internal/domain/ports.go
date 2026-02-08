@@ -13,6 +13,12 @@ type FlightSearcher interface {
 	PriceOffers(ctx context.Context, offers []FlightOffer) (*FlightSearchResponse, error)
 }
 
+// UpsellProvider defines the port for retrieving branded fare / upsell offers
+type UpsellProvider interface {
+	// GetUpsellOffers retrieves branded fare upsell options for flight offers
+	GetUpsellOffers(ctx context.Context, offers []FlightOffer) (*FlightSearchResponse, error)
+}
+
 // FlightBooker defines the port for booking flights
 type FlightBooker interface {
 	// CreateOrder creates a flight booking
@@ -83,32 +89,8 @@ type LocationResult struct {
 // SeatmapProvider defines the port for retrieving seatmaps
 type SeatmapProvider interface {
 	// GetSeatmap retrieves the seatmap for flight offers
-	GetSeatmap(ctx context.Context, offers []FlightOffer) ([]SeatmapData, error)
-}
-
-// SeatmapData contains seatmap information
-type SeatmapData struct {
-	ID          string         `json:"id"`
-	Departure   FlightEndpoint `json:"departure"`
-	Arrival     FlightEndpoint `json:"arrival"`
-	CarrierCode string         `json:"carrierCode"`
-	Number      string         `json:"number"`
-	Aircraft    Aircraft       `json:"aircraft"`
-	Decks       []Deck         `json:"decks"`
-}
-
-// Deck represents an aircraft deck
-type Deck struct {
-	DeckType string `json:"deckType"`
-	Seats    []Seat `json:"seats"`
-}
-
-// Seat represents a seat
-type Seat struct {
-	Number              string   `json:"number"`
-	Cabin               string   `json:"cabin"`
-	Characteristics     []string `json:"characteristicsCodes,omitempty"`
-	AvailabilityStatus  string   `json:"seatAvailabilityStatus,omitempty"`
+	// Returns the full SeatmapResponse including data and dictionaries
+	GetSeatmap(ctx context.Context, offers []FlightOffer) (*SeatmapResponse, error)
 }
 
 // FlightStatusProvider defines the port for flight status

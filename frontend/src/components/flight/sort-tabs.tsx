@@ -1,10 +1,13 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { TrendingDown, Zap, Star } from 'lucide-react';
 import { cn, formatCurrency, parseDuration } from '@/lib/utils';
 import type { FlightOffer } from '@/types/flight';
 
 // ============================================================================
-// Sort Tabs Component - Kayak-style sorting with preview
+// Sort Tabs Component — Google Flights / Skyscanner style
 // ============================================================================
 
 export type SortTabOption = 'cheapest' | 'best' | 'fastest';
@@ -17,12 +20,8 @@ interface SortTabsProps {
 }
 
 /**
- * Calculate the "Best" score for a flight offer
- * Lower score = better option
- * Factors:
- * - Price (normalized to 0-100)
- * - Duration (normalized to 0-100)
- * - Number of stops (0 stops = 0, 1 stop = 25, 2+ stops = 50)
+ * Calculate the "Best" score for a flight offer.
+ * Lower score = better option.
  */
 export function calculateBestScore(
   offer: FlightOffer,
@@ -36,136 +35,169 @@ export function calculateBestScore(
     (sum, it) => sum + parseDuration(it.duration),
     0
   );
-
-  // Calculate total stops across all itineraries
   const totalStops = offer.itineraries.reduce(
     (sum, it) => sum + (it.segments.length - 1),
     0
   );
 
-  // Normalize price (0-100)
   const priceRange = maxPrice - minPrice;
   const priceScore = priceRange > 0 ? ((price - minPrice) / priceRange) * 100 : 0;
-
-  // Normalize duration (0-100)
   const durationRange = maxDuration - minDuration;
   const durationScore = durationRange > 0 ? ((totalDuration - minDuration) / durationRange) * 100 : 0;
-
-  // Stops score
   const stopsScore = totalStops === 0 ? 0 : totalStops === 1 ? 15 : 30;
 
-  // Weighted score: Price 45%, Duration 40%, Stops 15%
   return priceScore * 0.45 + durationScore * 0.40 + stopsScore * 0.15;
 }
 
-/**
- * Get the best offer for each category
- */
 function getPreviewData(offers: FlightOffer[]) {
-  if (offers.length === 0) {
-    return { cheapest: null, best: null, fastest: null };
-  }
+  if (offers.length === 0) return { cheapest: null, best: null, fastest: null };
 
-  // Cheapest
   const cheapest = [...offers].sort(
     (a, b) => parseFloat(a.price.total) - parseFloat(b.price.total)
   )[0];
 
-  // Fastest (by total duration of all itineraries)
   const fastest = [...offers].sort((a, b) => {
-    const durationA = a.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0);
-    const durationB = b.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0);
-    return durationA - durationB;
+    const dA = a.itineraries.reduce((s, it) => s + parseDuration(it.duration), 0);
+    const dB = b.itineraries.reduce((s, it) => s + parseDuration(it.duration), 0);
+    return dA - dB;
   })[0];
 
-  // Best (calculate scores)
   const prices = offers.map((o) => parseFloat(o.price.total));
   const durations = offers.map((o) =>
-    o.itineraries.reduce((sum, it) => sum + parseDuration(it.duration), 0)
+    o.itineraries.reduce((s, it) => s + parseDuration(it.duration), 0)
   );
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const minDuration = Math.min(...durations);
-  const maxDuration = Math.max(...durations);
+  const [minP, maxP] = [Math.min(...prices), Math.max(...prices)];
+  const [minD, maxD] = [Math.min(...durations), Math.max(...durations)];
 
-  const best = [...offers].sort((a, b) => {
-    const scoreA = calculateBestScore(a, minPrice, maxPrice, minDuration, maxDuration);
-    const scoreB = calculateBestScore(b, minPrice, maxPrice, minDuration, maxDuration);
-    return scoreA - scoreB;
-  })[0];
+  const best = [...offers].sort((a, b) =>
+    calculateBestScore(a, minP, maxP, minD, maxD) - calculateBestScore(b, minP, maxP, minD, maxD)
+  )[0];
 
   return { cheapest, best, fastest };
 }
 
-function getTotalDuration(offer: FlightOffer): string {
+function getTotalDurationLabel(offer: FlightOffer): string {
   const totalMinutes = offer.itineraries.reduce(
-    (sum, it) => sum + parseDuration(it.duration),
-    0
+    (sum, it) => sum + parseDuration(it.duration), 0
   );
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}:${minutes.toString().padStart(2, '0')} Std.`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h ${m.toString().padStart(2, '0')}m`;
 }
 
 export function SortTabs({ value, onChange, offers, className }: SortTabsProps) {
   const { cheapest, best, fastest } = getPreviewData(offers);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const tabs: { id: SortTabOption; label: string; price: string; duration: string }[] = [
+  // Scroll active tab into view on mobile
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const active = scrollRef.current.querySelector('[data-active="true"]');
+    if (active) {
+      active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [value]);
+
+  const tabs: {
+    id: SortTabOption;
+    label: string;
+    icon: React.ReactNode;
+    price: string;
+    detail: string;
+  }[] = [
     {
       id: 'cheapest',
-      label: 'Günstigster Preis',
-      price: cheapest ? formatCurrency(cheapest.price.total, cheapest.price.currency) : '-',
-      duration: cheapest ? getTotalDuration(cheapest) : '-',
+      label: 'Günstigster',
+      icon: <TrendingDown className="h-4 w-4" />,
+      price: cheapest ? formatCurrency(cheapest.price.total, cheapest.price.currency) : '–',
+      detail: cheapest ? getTotalDurationLabel(cheapest) : '',
     },
     {
       id: 'best',
-      label: 'Beste Option',
-      price: best ? formatCurrency(best.price.total, best.price.currency) : '-',
-      duration: best ? getTotalDuration(best) : '-',
+      label: 'Beste',
+      icon: <Star className="h-4 w-4" />,
+      price: best ? formatCurrency(best.price.total, best.price.currency) : '–',
+      detail: best ? getTotalDurationLabel(best) : '',
     },
     {
       id: 'fastest',
-      label: 'Schnellste Option',
-      price: fastest ? formatCurrency(fastest.price.total, fastest.price.currency) : '-',
-      duration: fastest ? getTotalDuration(fastest) : '-',
+      label: 'Schnellster',
+      icon: <Zap className="h-4 w-4" />,
+      price: fastest ? formatCurrency(fastest.price.total, fastest.price.currency) : '–',
+      detail: fastest ? getTotalDurationLabel(fastest) : '',
     },
   ];
 
   return (
-    <div className={cn('flex w-full overflow-x-auto border-b border-border', className)}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            'relative min-w-0 flex-1 px-2 py-2 text-left transition-colors sm:px-3 sm:py-2.5 md:px-4 md:py-3',
-            'hover:bg-muted/50',
-            value === tab.id && 'bg-primary/10'
-          )}
-        >
-          {/* Active indicator */}
-          {value === tab.id && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-          )}
+    <div
+      ref={scrollRef}
+      role="tablist"
+      aria-label="Sortierung"
+      className={cn(
+        'flex overflow-x-auto scrollbar-none snap-x snap-mandatory',
+        className
+      )}
+    >
+      {tabs.map((tab) => {
+        const isActive = value === tab.id;
+        return (
+          <button
+            key={tab.id}
+            data-active={isActive}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              'relative flex-1 min-w-[110px] snap-center px-2.5 py-2.5 sm:px-3 sm:py-3 text-center transition-all duration-200',
+              'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/50 focus-visible:ring-inset',
+              'active:bg-gray-100 dark:active:bg-gray-800',
+              isActive ? 'bg-gray-50/80 dark:bg-gray-800/50' : ''
+            )}
+            aria-selected={isActive}
+            role="tab"
+          >
+            {/* Active underline */}
+            {isActive && (
+              <motion.div
+                layoutId="sort-tab-indicator"
+                className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-pink-500"
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
 
-          {/* Label */}
-          <span className={cn(
-            'block truncate text-xs font-medium sm:text-sm',
-            value === tab.id
-              ? 'text-primary'
-              : 'text-muted-foreground'
-          )}>
-            {tab.label}
-          </span>
+            {/* Icon + Label */}
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+              <span className={cn(
+                'transition-colors',
+                isActive ? 'text-pink-500' : 'text-muted-foreground'
+              )}>
+                {tab.icon}
+              </span>
+              <span className={cn(
+                'text-xs font-semibold sm:text-sm transition-colors',
+                isActive ? 'text-gray-900 dark:text-gray-100' : 'text-muted-foreground'
+              )}>
+                {tab.label}
+              </span>
+            </div>
 
-          {/* Price and duration preview */}
-          <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground sm:gap-1.5 sm:text-xs">
-            <span className="shrink-0 font-medium text-foreground">{tab.price}</span>
-            <span className="shrink-0">•</span>
-            <span className="truncate">{tab.duration}</span>
-          </div>
-        </button>
-      ))}
+            {/* Price preview */}
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+              <span className={cn(
+                'font-bold transition-colors',
+                isActive ? 'text-foreground' : 'text-foreground/80'
+              )}>
+                {tab.price}
+              </span>
+              {tab.detail && (
+                <>
+                  <span className="text-muted-foreground/40 hidden sm:inline">·</span>
+                  <span className="hidden sm:inline">{tab.detail}</span>
+                </>
+              )}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
