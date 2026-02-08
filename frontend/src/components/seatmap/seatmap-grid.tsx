@@ -217,7 +217,20 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             />
           ))}
 
-          {/* Row numbers (LEFT side) — clean, no wing/exit decorations */}
+          {/* Wing zone — very subtle background tint (no borders, no icons) */}
+          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
+            const isWing = rowNum >= wingStart && rowNum <= wingEnd && wingStart > 0;
+            if (!isWing) return null;
+            return (
+              <div
+                key={`wing-bg-${rowNum}`}
+                className="bg-sky-50/60 dark:bg-sky-950/20 pointer-events-none rounded-sm"
+                style={{ gridRow, gridColumn: `2 / ${rightLabelCol}` }}
+              />
+            );
+          })}
+
+          {/* Row numbers (LEFT side) */}
           {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => (
               <div
                 key={`row-${rowNum}`}
@@ -228,6 +241,22 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                 <span>{xToRowLabel.get(rowNum) ?? rowNum}</span>
               </div>
           ))}
+
+          {/* EXIT labels in aisle gaps — like real aircraft seatmaps */}
+          {aisleGridCols.map((gc) =>
+            Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
+              if (!exitRows.has(rowNum)) return null;
+              return (
+                <div
+                  key={`exit-${gc}-${rowNum}`}
+                  className="flex items-center justify-center text-[7px] font-black tracking-widest text-red-500 dark:text-red-400 uppercase pointer-events-none"
+                  style={{ gridRow, gridColumn: gc }}
+                >
+                  EXIT
+                </div>
+              );
+            })
+          )}
 
           {/* Seats */}
           {deck.seats.map((seat) => {
