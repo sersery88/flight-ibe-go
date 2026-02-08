@@ -230,33 +230,33 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             );
           })}
 
-          {/* Row numbers (LEFT side) */}
-          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => (
-              <div
-                key={`row-${rowNum}`}
-                className="text-xs font-medium text-muted-foreground flex items-center justify-end pr-1 w-full"
-                style={{ gridRow, gridColumn: 1 }}
-                role="rowheader"
-              >
-                <span>{xToRowLabel.get(rowNum) ?? rowNum}</span>
-              </div>
-          ))}
-
-          {/* EXIT labels in aisle gaps — like real aircraft seatmaps */}
-          {aisleGridCols.map((gc) =>
-            Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
-              if (!exitRows.has(rowNum)) return null;
-              return (
+          {/* Row numbers (LEFT) + EXIT labels (both sides) */}
+          {Array.from(rowMap.entries()).map(([rowNum, gridRow]) => {
+            const isExit = exitRows.has(rowNum);
+            const label = xToRowLabel.get(rowNum) ?? rowNum;
+            return (
+              <React.Fragment key={`row-${rowNum}`}>
+                {/* Left: row number, stacked with EXIT below for exit rows */}
                 <div
-                  key={`exit-${gc}-${rowNum}`}
-                  className="flex items-center justify-center text-[7px] font-black tracking-widest text-red-500 dark:text-red-400 uppercase pointer-events-none"
-                  style={{ gridRow, gridColumn: gc }}
+                  className="flex flex-col items-end justify-center pr-1 w-full"
+                  style={{ gridRow, gridColumn: 1 }}
+                  role="rowheader"
                 >
-                  EXIT
+                  <span className="text-xs font-medium text-muted-foreground leading-tight">{label}</span>
+                  {isExit && <span className="text-[7px] font-black tracking-wide text-red-500 dark:text-red-400 leading-tight">EXIT</span>}
                 </div>
-              );
-            })
-          )}
+                {/* Right: EXIT label for exit rows */}
+                {isExit && (
+                  <div
+                    className="flex flex-col items-start justify-center pl-1 w-full"
+                    style={{ gridRow, gridColumn: rightLabelCol }}
+                  >
+                    <span className="text-[7px] font-black tracking-wide text-red-500 dark:text-red-400 leading-tight">EXIT</span>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
 
           {/* Seats */}
           {deck.seats.map((seat) => {
