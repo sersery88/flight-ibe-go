@@ -3,25 +3,25 @@
 import React, { useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Seat, SeatStatus } from '@/types/seatmap';
-import { getSeatCharacteristic } from '@/lib/seat-characteristics';
+import { getSeatCharacteristic, GENERIC_SYSTEM_CODES } from '@/lib/seat-characteristics';
 import { getSeatCategory, CATEGORY_STYLES, type SeatCategory } from '@/lib/seat-categories';
 
 // ============================================================================
 // Codes to SKIP in the detail list (handled by category badge or position)
 // ============================================================================
 
-// Codes to skip entirely in the UI (position handled separately, generic codes not useful)
-const SKIP_CODES = new Set(['W', 'A', 'M', 'CC', 'CH', '1A', 'N', 'R', 'RS']);
+// Position codes handled separately in the header
+const POSITION_CODES = new Set(['W', 'A', 'M', 'CC']);
 
 // Codes that are already represented by the category badge — don't repeat them
 const CATEGORY_CODES: Record<SeatCategory, Set<string>> = {
   exit:       new Set(['E', 'IE']),
-  preferred:  new Set(['P', 'PS', '1A', '1A_AQC_PREMIUM_SEAT', 'EC']),
+  preferred:  new Set(['P', 'PS', 'EC']),
   extraleg:   new Set(['L', 'XL']),
   bulkhead:   new Set(['K']),
   bassinet:   new Set(['B', 'BK']),
   accessible: new Set(['H']),
-  pet:        new Set([]),  // CH = Chargeable, not pet
+  pet:        new Set(),
   restricted: new Set(),
   standard:   new Set(),
 };
@@ -44,8 +44,9 @@ function buildUniqueCharacteristics(codes: string[] | undefined, category: SeatC
   const items: CharItem[] = [];
 
   for (const code of codes) {
-    if (SKIP_CODES.has(code)) continue;
-    if (skipCodes.has(code)) continue;
+    if (GENERIC_SYSTEM_CODES.has(code)) continue;  // CH, 1A, 1A_AQC_PREMIUM_SEAT, N, R, RS
+    if (POSITION_CODES.has(code)) continue;         // W, A, M, CC — shown in header
+    if (skipCodes.has(code)) continue;               // Category-specific duplicates
     
     const def = getSeatCharacteristic(code);
     if (!def) continue;

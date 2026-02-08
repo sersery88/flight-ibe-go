@@ -1,75 +1,100 @@
 /**
  * IATA Seat Characteristic Code Mapping
  *
- * Complete mapping of IATA standard codes (PADIS 9825), Amadeus extensions,
- * and facility type codes used in seatmap rendering.
+ * Based on IATA PADIS Code List 9825 + Amadeus extensions.
+ * Verified against real Amadeus SeatMap API responses (Feb 2026).
+ *
+ * IMPORTANT: Codes like CH (Chargeable) and 1A_AQC_PREMIUM_SEAT appear on
+ * nearly ALL seats — they are generic pricing flags, NOT seat features!
  */
 
 import type { SeatCharacteristicDef, FacilityTypeDef } from '@/types/seatmap';
+
+// ============================================================================
+// Codes that appear on 90%+ of all seats — purely system/pricing flags.
+// These are NEVER shown in the UI and NEVER used for categorization.
+// ============================================================================
+export const GENERIC_SYSTEM_CODES = new Set([
+  'CH',                   // PADIS 9825: Chargeable seat (appears on ~100% of seats)
+  '1A',                   // Amadeus generic: seat priced by Amadeus system (~20-70%)
+  '1A_AQC_PREMIUM_SEAT',  // Amadeus: "seat has individual pricing" (~95-100%, NOT actually premium!)
+  'N',                    // PADIS 9825: No seat at this position / not operational
+  'R',                    // PADIS 9825: Right side of aircraft (positional, redundant with column)
+  'RS',                   // PADIS 9825: Right side of aircraft (synonym of R)
+]);
 
 // ============================================================================
 // IATA Standard Seat Characteristics (PADIS Code 9825)
 // ============================================================================
 
 export const SEAT_CHARACTERISTICS: Record<string, SeatCharacteristicDef> = {
-  // ---- Position ----
+  // ---- Position (PADIS 9825) ----
   'W':  { label: 'Fenster', icon: '🪟' },
   'A':  { label: 'Gang', icon: '🚶' },
   'M':  { label: 'Mittelplatz', icon: '💺' },
+  'CC': { label: 'Mittelplatz', icon: '💺' },  // PADIS: Center seat (center section)
 
-  // ---- Special Locations ----
+  // ---- Special Locations (PADIS 9825) ----
   'K':  { label: 'Bulkhead', icon: '🔲' },
   'E':  { label: 'Notausgang', icon: '🚪', warning: true },
   'IE': { label: 'Neben Notausgang', icon: '🚪' },
   'OW': { label: 'Über dem Flügel', icon: '✈️' },
+  'O':  { label: 'Über dem Flügel', icon: '✈️' },  // PADIS: Overwing — same as OW in some systems
 
-  // ---- Legroom / Recline ----
+  // ---- Legroom / Recline (PADIS 9825) ----
   'L':  { label: 'Extra Beinfreiheit', icon: '🦵' },
   'LS': { label: 'Rückenlehne eingeschränkt', icon: '⚠️', warning: true },
   '1':  { label: 'Nicht verstellbar', icon: '⚠️', warning: true },
   'LR': { label: 'Eingeschränkte Beinfreiheit', icon: '⚠️', warning: true },
 
-  // ---- Nearby Facilities ----
+  // ---- Nearby Facilities (PADIS 9825) ----
   'LA': { label: 'Neben Toilette', icon: '🚻', warning: true },
   'GA': { label: 'Neben Küche', icon: '🍽️', warning: true },
   'B':  { label: 'Bassinet-Position (Babybett)', icon: '👶' },
   'BK': { label: 'Bassinet-Position (Babybett)', icon: '👶' },
   'BA': { label: 'Neben Bar', icon: '🍸' },
 
-  // ---- Accessibility ----
+  // ---- Accessibility (PADIS 9825) ----
   'H':  { label: 'Rollstuhlgerecht', icon: '♿' },
-  'CH': { label: 'Kostenpflichtiger Sitz', icon: '💳' },
 
-  // ---- View / Comfort ----
+  // ---- View / Comfort (PADIS 9825) ----
   'V':  { label: 'Eingeschränkte Sicht', icon: '👁️', warning: true },
-  'MV': { label: 'Vor Bildschirm', icon: '📺' },
-  'GN': { label: 'Gruppenplatz', icon: '👥' },
+  'Q':  { label: 'Ruhezone', icon: '🤫' },
 
-  // ---- Seat Features ----
+  // ---- Seat Features (PADIS 9825) ----
   'PC': { label: 'Steckdose vorhanden', icon: '🔌' },
-  'USB': { label: 'USB-Anschluss', icon: '🔋' },
-  'CC': { label: 'Mittlerer Sitzplatz', icon: '💺' },
+  'I':  { label: 'Einzelsitz / individuell', icon: '💺' },  // PADIS: Individual seat
   'J':  { label: 'Junktionsreihe', icon: '🔗' },
-  'N':  { label: 'Kein Sitz an dieser Position', icon: '❌' },
 
-  // ---- Recline Types ----
-  'R':  { label: 'Rechte Seite', icon: '➡️' },
-  'RS': { label: 'Rechte Seite', icon: '➡️' },
+  // ---- Pricing / Designation (PADIS 9825) ----
+  'FC': { label: 'Kostenloser Sitzplatz', icon: '🆓' },  // PADIS: Free of Charge — no extra fee
+  'DE': { label: 'Abschlagsfähig / Vergünstigt', icon: '💰' },  // PADIS: Discountable/Eligible for discount
+  'U':  { label: 'Upgrade-Sitz', icon: '⬆️' },  // PADIS: Upper class/Upgrade eligible
 
-  // ---- Amadeus Extensions ----
-  '1A': { label: 'Kostenpflichtig', icon: '💳' }, // Generic Amadeus chargeable indicator
-  '1A_AQC_PREMIUM_SEAT': { label: 'Premium Sitzplatz', icon: '⭐' },
+  // ---- Amadeus Extension Codes ----
+  '1B': { label: 'Eingeschränkte Beinfreiheit', icon: '⚠️', warning: true },  // Amadeus: restricted legroom/pitch
+  '1D': { label: 'In der Nähe der Trennwand', icon: '🔲' },  // Amadeus: near divider/bulkhead area
+  'MV': { label: 'Vor Bildschirm', icon: '📺' },
+
+  // ---- Seat Format / Layout (PADIS 9825) ----
+  '9':  { label: 'Mittlerer Platz (Reihe)', icon: '💺' },  // PADIS: Center seat in a row
+  'AG': { label: 'Am Gang (beidseitig erreichbar)', icon: '🚶' },  // PADIS: Adjacent to gang (aisle accessible)
+  'AL': { label: 'Gang-seitig links', icon: '🚶' },  // PADIS: Aisle left
+  'MA': { label: 'Mittlerer Gang', icon: '🚶' },  // PADIS: Middle aisle seat
+
+  // ---- Amadeus Business/Cabin ----
   'P':  { label: 'Preferred Sitzplatz', icon: '⭐' },
   'UP': { label: 'Upgrade möglich', icon: '⬆️' },
   'EC': { label: 'Economy Comfort', icon: '🛋️' },
   'PS': { label: 'Premium Seat', icon: '⭐' },
   'XL': { label: 'Extra Legroom', icon: '🦵' },
+  'GN': { label: 'Gruppenplatz', icon: '👥' },
 
-  // ---- Cabin Type Indicators ----
-  'F':  { label: 'First Class Sitz', icon: '👑' },
-  'C':  { label: 'Business Class Sitz', icon: '💼' },
-  'Y':  { label: 'Economy Class Sitz', icon: '💺' },
-  'S':  { label: 'Premium Economy Sitz', icon: '🛋️' },
+  // ---- Cabin Type Indicators (PADIS 9825) ----
+  'F':  { label: 'First Class', icon: '👑' },
+  'C':  { label: 'Business Class', icon: '💼' },
+  'Y':  { label: 'Economy Class', icon: '💺' },
+  'S':  { label: 'Premium Economy', icon: '🛋️' },
 
   // ---- Storage ----
   'ST': { label: 'Kein Stauraum unter Vordersitz', icon: '⚠️', warning: true },
@@ -88,11 +113,11 @@ export const FACILITY_TYPES: Record<string, FacilityTypeDef> = {
   'G':  { label: 'Küche', icon: '🍽️' },
   'GY': { label: 'Küche', icon: '🍽️' },
   'CL': { label: 'Garderobe', icon: '🧥' },
-  'ST': { label: 'Treppe', icon: '🪜' },         // A380, 747
-  'BA': { label: 'Bar', icon: '🍸' },             // Emirates A380
+  'ST': { label: 'Treppe', icon: '🪜' },
+  'BA': { label: 'Bar', icon: '🍸' },
   'SO': { label: 'Lager', icon: '📦' },
   'LB': { label: 'Lounge / Liegebereich', icon: '🛋️' },
-  'SH': { label: 'Dusche', icon: '🚿' },         // Emirates First
+  'SH': { label: 'Dusche', icon: '🚿' },
   'E':  { label: 'Notausgang', icon: '🚪' },
   'EX': { label: 'Notausgang', icon: '🚪' },
   'BK': { label: 'Bassinet', icon: '👶' },
@@ -106,15 +131,15 @@ export const FACILITY_TYPES: Record<string, FacilityTypeDef> = {
 
 /**
  * Look up a seat characteristic definition by code.
- * Returns undefined for unknown codes.
+ * Skips generic system codes (CH, 1A, etc.) — returns undefined for those.
  */
 export function getSeatCharacteristic(code: string): SeatCharacteristicDef | undefined {
+  if (GENERIC_SYSTEM_CODES.has(code)) return undefined;
   return SEAT_CHARACTERISTICS[code];
 }
 
 /**
  * Look up a facility type definition by code.
- * Returns undefined for unknown codes.
  */
 export function getFacilityType(code: string): FacilityTypeDef | undefined {
   return FACILITY_TYPES[code];
@@ -122,17 +147,14 @@ export function getFacilityType(code: string): FacilityTypeDef | undefined {
 
 /**
  * Build a human-readable seat label from the seat number and its
- * characteristic codes.
- *
- * @example
- * getSeatLabel("14A", ["W", "L"])
- * // → "14A · Fenster · Extra Beinfreiheit"
+ * characteristic codes. Skips generic system codes.
  */
 export function getSeatLabel(seatNumber: string, characteristicsCodes?: string[]): string {
   const parts = [seatNumber];
 
   if (characteristicsCodes) {
     for (const code of characteristicsCodes) {
+      if (GENERIC_SYSTEM_CODES.has(code)) continue;
       const def = SEAT_CHARACTERISTICS[code];
       if (def) {
         parts.push(def.label);
@@ -144,12 +166,13 @@ export function getSeatLabel(seatNumber: string, characteristicsCodes?: string[]
 }
 
 /**
- * Check whether a seat's characteristics include any warning codes
- * (limited recline, restricted view, near lavatory, etc.).
+ * Check whether a seat's characteristics include any warning codes.
  */
 export function hasWarningCharacteristic(characteristicsCodes?: string[]): boolean {
   if (!characteristicsCodes) return false;
-  return characteristicsCodes.some((code) => SEAT_CHARACTERISTICS[code]?.warning === true);
+  return characteristicsCodes.some(
+    (code) => !GENERIC_SYSTEM_CODES.has(code) && SEAT_CHARACTERISTICS[code]?.warning === true
+  );
 }
 
 /**
@@ -166,6 +189,7 @@ export function isExitRow(characteristicsCodes?: string[]): boolean {
 export function getWarningLabels(characteristicsCodes?: string[]): string[] {
   if (!characteristicsCodes) return [];
   return characteristicsCodes
+    .filter((code) => !GENERIC_SYSTEM_CODES.has(code))
     .map((code) => SEAT_CHARACTERISTICS[code])
     .filter((def): def is SeatCharacteristicDef => def?.warning === true)
     .map((def) => def.label);
@@ -173,9 +197,6 @@ export function getWarningLabels(characteristicsCodes?: string[]): string[] {
 
 /**
  * Get the facility label for a facility code, with dictionary fallback.
- *
- * @param code - Facility code from the API
- * @param dictionaries - Optional dictionaries from the API response for label resolution
  */
 export function getFacilityLabel(
   code: string,

@@ -45,8 +45,9 @@ export function getSeatCategory(codes?: string[]): SeatCategory {
 
   // Priority order — first match wins
   if (codes.includes('E') || codes.includes('IE')) return 'exit';
-  // Only full premium code, NOT bare '1A' (which is generic Amadeus "chargeable")
-  if (codes.some(c => ['P', 'PS', '1A_AQC_PREMIUM_SEAT', 'EC'].includes(c))) return 'preferred';
+  // P, PS, EC are real premium indicators. 
+  // 1A_AQC_PREMIUM_SEAT appears on 95-100% of ALL seats — it's a generic pricing flag, NOT premium!
+  if (codes.some(c => ['P', 'PS', 'EC'].includes(c))) return 'preferred';
   if (codes.includes('L') || codes.includes('XL')) return 'extraleg';
   if (codes.includes('K')) return 'bulkhead';
   if (codes.includes('B') || codes.includes('BK')) return 'bassinet';

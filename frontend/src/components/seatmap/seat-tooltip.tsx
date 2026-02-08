@@ -5,6 +5,7 @@ import type { Seat, SeatStatus } from '@/types/seatmap';
 import {
   getSeatCharacteristic,
   isExitRow,
+  GENERIC_SYSTEM_CODES,
 } from '@/lib/seat-characteristics';
 import {
   Tooltip,
@@ -23,7 +24,7 @@ interface CharBadge {
 }
 
 // Position codes — displayed in header, not as badges
-const SKIP_CODES = new Set(['W', 'A', 'M', 'CC', 'CH', '1A', 'N', 'R', 'RS']);
+const POSITION_CODES = new Set(['W', 'A', 'M', 'CC']);
 
 // ============================================================================
 // Build grouped characteristics
@@ -34,7 +35,8 @@ function buildCharacteristicBadges(codes?: string[]): CharBadge[] {
   const badges: CharBadge[] = [];
 
   for (const code of codes) {
-    if (SKIP_CODES.has(code)) continue;
+    if (GENERIC_SYSTEM_CODES.has(code)) continue;  // CH, 1A, 1A_AQC_PREMIUM_SEAT, N, R, RS
+    if (POSITION_CODES.has(code)) continue;         // W, A, M, CC — shown in header
     const def = getSeatCharacteristic(code);
     if (!def) continue;
 
