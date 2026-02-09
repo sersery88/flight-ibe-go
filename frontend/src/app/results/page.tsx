@@ -514,7 +514,7 @@ function ResultsContent() {
         <div className="w-full max-w-7xl px-4 py-4 sm:py-6">
           <div className="flex gap-6">
             {/* Desktop Sidebar */}
-            <aside className="hidden w-72 shrink-0 lg:block sticky top-[70px] self-start max-h-[calc(100vh-90px)] overflow-y-auto" aria-label="Filter">
+            <aside className="hidden w-72 shrink-0 lg:block" aria-label="Filter">
               <FilterSidebar
                 offers={searchResults}
                 filters={filters}
