@@ -1194,13 +1194,22 @@ func enrichFlightOffer(offer *domain.FlightOffer) {
 		}
 	}
 
-	// Compute total duration and stops
+	// Compute total duration and stops; fill missing itinerary durations from segments
 	totalDuration := 0
 	totalStops := 0
-	for _, itinerary := range offer.Itineraries {
+	for i := range offer.Itineraries {
+		itinerary := &offer.Itineraries[i]
 		totalStops += len(itinerary.Segments) - 1
-		
-		// Parse duration (ISO 8601 format like "PT2H30M")
+
+		// If Amadeus omitted itinerary-level duration (e.g. upsell), compute from segments
+		if itinerary.Duration == "" && len(itinerary.Segments) > 0 {
+			itinMins := 0
+			for _, seg := range itinerary.Segments {
+				itinMins += parseDuration(seg.Duration)
+			}
+			itinerary.Duration = fmt.Sprintf("PT%dH%dM", itinMins/60, itinMins%60)
+		}
+
 		if itinerary.Duration != "" {
 			totalDuration += parseDuration(itinerary.Duration)
 		}
