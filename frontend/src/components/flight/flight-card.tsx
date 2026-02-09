@@ -437,24 +437,7 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
                           />
                         ))}
                       </div>
-                      {hasHiddenFares && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setShowAllFares(prev => !prev); }}
-                          className="mt-2 flex items-center gap-1 text-[11px] font-medium text-pink-500 hover:text-pink-600 transition-colors"
-                        >
-                          {showAllFares ? (
-                            <>
-                              <ChevronUp className="h-3 w-3" />
-                              Nur {getCabinLabel(searchedCabinClass)}-Tarife anzeigen
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-3 w-3" />
-                              Alle Kabinen anzeigen (Upgrade-Optionen)
-                            </>
-                          )}
-                        </button>
-                      )}
+{/* No upsell toggle — only searched cabin class */}
                     </>
                   ) : (
                     <p className="py-2 text-xs text-muted-foreground">
