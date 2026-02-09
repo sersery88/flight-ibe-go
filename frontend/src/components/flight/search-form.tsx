@@ -105,7 +105,7 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
       {store.tripType !== 'multicity' ? (
         <div className="space-y-3 md:space-y-0">
           {/* Desktop: single-row grid layout */}
-          <div className="flex flex-col gap-2 md:grid md:grid-cols-[1fr,auto,1fr,1fr,auto] md:items-center md:gap-0">
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-[1fr_auto_1fr_1fr_auto] md:items-center md:gap-0">
             {/* Origin */}
             <div className="min-w-0">
               <AirportCombobox
