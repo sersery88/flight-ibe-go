@@ -150,12 +150,12 @@ export default function HomePage() {
             </div>
 
             <h1 className="mb-3 text-3xl font-extrabold leading-tight tracking-tight text-gray-900 dark:text-gray-50 sm:text-4xl md:text-5xl lg:text-6xl">
-              Finde deinen{' '}
-              <span className="text-pink-500">perfekten Flug</span>
+              Wohin geht&apos;s{' '}
+              <span className="text-pink-500">als Nächstes?</span>
             </h1>
 
             <p className="mx-auto max-w-lg text-sm text-gray-500 dark:text-gray-400 sm:text-base md:text-lg">
-              Vergleiche Preise von über 400 Airlines weltweit — schnell, einfach und transparent.
+              400+ Airlines. Ein Klick. Ab in die Ferne.
             </p>
           </motion.div>
 
