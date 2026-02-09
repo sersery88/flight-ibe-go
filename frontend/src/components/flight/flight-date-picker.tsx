@@ -766,31 +766,36 @@ export function FlightDatePicker({
 
   return (
     <div className={cn('relative', className)} ref={containerRef}>
-      {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={() => (isOpen ? handleClose() : handleOpen())}
-        className={cn(
-          'flex w-full items-center gap-2 text-left text-sm transition-all duration-200 cursor-pointer min-h-[48px]',
-          compact
-            ? 'rounded-xl border-0 bg-white/80 px-4 py-3 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-            : 'rounded-xl border bg-white dark:bg-gray-900 px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 dark:border-gray-700',
-          'focus:outline-none',
-        )}
-      >
-        <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-500 shrink-0" />
-        <span className={cn('whitespace-nowrap font-medium dark:text-gray-100', !value?.from && 'text-gray-400 dark:text-gray-500 font-normal')}>
-          {value?.from ? formatShortDate(value.from) : 'Hinflug'}
-        </span>
-        {isRange && (
-          <>
-            <span className="text-gray-300 dark:text-gray-600">→</span>
-            <span className={cn('whitespace-nowrap font-medium dark:text-gray-100', !value?.to && 'text-gray-400 dark:text-gray-500 font-normal')}>
-              {value?.to ? formatShortDate(value.to) : 'Rückflug'}
-            </span>
-          </>
-        )}
-      </button>
+      {/* Trigger Button — matches AirportCombobox styling */}
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+          <Calendar className="h-5 w-5 text-gray-400 transition-colors" />
+        </div>
+        <button
+          type="button"
+          onClick={() => (isOpen ? handleClose() : handleOpen())}
+          className={cn(
+            'flex w-full items-center gap-2 text-left text-sm font-medium transition-all duration-200 cursor-pointer truncate',
+            'min-h-[48px]',
+            compact
+              ? 'rounded-xl border-0 bg-gray-50 py-3.5 pl-12 pr-4 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'rounded-xl border border-gray-200 dark:border-gray-700 bg-background py-3.5 pl-12 pr-4 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
+            'focus:outline-none',
+          )}
+        >
+          <span className={cn('whitespace-nowrap', value?.from ? 'text-foreground' : 'text-muted-foreground/60 font-normal')}>
+            {value?.from ? formatShortDate(value.from) : 'Hinflug'}
+          </span>
+          {isRange && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600">→</span>
+              <span className={cn('whitespace-nowrap', value?.to ? 'text-foreground' : 'text-muted-foreground/60 font-normal')}>
+                {value?.to ? formatShortDate(value.to) : 'Rückflug'}
+              </span>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Calendar popup */}
       {mounted && (
@@ -1127,21 +1132,27 @@ export function SingleFlightDatePicker({
 
   return (
     <div className={cn('relative', className)} ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => (isOpen ? handleClose() : handleOpen())}
-        className={cn(
-          'flex w-full items-center gap-2 text-left text-sm transition-all duration-200 cursor-pointer min-h-[48px]',
-          compact
-            ? 'rounded-xl border-0 bg-white/80 py-3.5 px-4 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-            : 'rounded-xl border bg-white dark:bg-gray-900 px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 dark:border-gray-700',
-          'focus:outline-none',
-          !value && 'text-gray-400 dark:text-gray-500',
-        )}
-      >
-        <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-500 shrink-0" />
-        <span className="font-medium text-gray-800 dark:text-gray-100">{value ? formatShortDate(value) : placeholder}</span>
-      </button>
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+          <Calendar className="h-5 w-5 text-gray-400 transition-colors" />
+        </div>
+        <button
+          type="button"
+          onClick={() => (isOpen ? handleClose() : handleOpen())}
+          className={cn(
+            'flex w-full items-center gap-2 text-left text-sm font-medium transition-all duration-200 cursor-pointer truncate',
+            'min-h-[48px]',
+            compact
+              ? 'rounded-xl border-0 bg-gray-50 py-3.5 pl-12 pr-4 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-lg focus:ring-2 focus:ring-pink-500/30 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'rounded-xl border border-gray-200 dark:border-gray-700 bg-background py-3.5 pl-12 pr-4 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
+            'focus:outline-none',
+          )}
+        >
+          <span className={cn('whitespace-nowrap', value ? 'text-foreground' : 'text-muted-foreground/60 font-normal')}>
+            {value ? formatShortDate(value) : placeholder}
+          </span>
+        </button>
+      </div>
 
       {mounted && (isMobile ? createPortal(mobileSheet, document.body) : desktopDropdown)}
     </div>

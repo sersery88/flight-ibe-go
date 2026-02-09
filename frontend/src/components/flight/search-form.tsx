@@ -103,11 +103,11 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
 
       {/* Main Search Fields */}
       {store.tripType !== 'multicity' ? (
-        <div className="space-y-3">
-          {/* Airport Fields */}
-          <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:gap-0">
+        <div className="space-y-3 md:space-y-0">
+          {/* Desktop: single-row grid layout */}
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-[1fr,auto,1fr,1fr,auto] md:items-center md:gap-0">
             {/* Origin */}
-            <div className="flex-1">
+            <div className="min-w-0">
               <AirportCombobox
                 value={store.origin}
                 valueName={store.originName}
@@ -136,7 +136,7 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
             </div>
 
             {/* Destination */}
-            <div className="flex-1">
+            <div className="min-w-0">
               <AirportCombobox
                 value={store.destination}
                 valueName={store.destinationName}
@@ -149,11 +149,9 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
                 compact
               />
             </div>
-          </div>
 
-          {/* Date + Search Row */}
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            <div className="flex-1">
+            {/* Date Picker */}
+            <div className="min-w-0">
               <FlightDatePicker
                 value={dateRangeValue}
                 onChange={handleDateRangeChange}
@@ -174,8 +172,8 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
               whileHover={!isSearchDisabled ? { scale: 1.02 } : {}}
               whileTap={!isSearchDisabled ? { scale: 0.98 } : {}}
               className={cn(
-                'flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-4 text-base font-semibold transition-all md:w-auto md:min-w-[160px]',
-                'min-h-[52px]',
+                'flex w-full items-center justify-center gap-2.5 rounded-xl px-6 text-sm font-semibold transition-all md:w-auto md:min-w-[140px]',
+                'h-[48px]',
                 isSearchDisabled
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                   : 'bg-pink-500 text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 hover:shadow-xl hover:shadow-pink-500/30'

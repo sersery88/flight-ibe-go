@@ -85,10 +85,10 @@ export function PassengerSelector({
       <Popover>
         <PopoverTrigger
           className={cn(
-            'flex items-center gap-2 text-left text-sm transition-all duration-150 cursor-pointer min-h-[44px]',
+            'flex items-center gap-2 text-left text-sm font-medium transition-all duration-150 cursor-pointer',
             compact
-              ? 'rounded-xl bg-gray-50 px-4 py-2.5 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-md focus:ring-2 focus:ring-pink-500/50 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-              : 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-background px-4 py-3 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
+              ? 'rounded-xl bg-gray-50 px-4 py-2.5 h-10 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-md focus:ring-2 focus:ring-pink-500/50 dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-background px-4 py-3 min-h-[48px] focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20',
             'focus:outline-none'
           )}
         >

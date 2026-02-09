@@ -51,10 +51,10 @@ export function CabinClassSelect({
         <SelectTrigger
           size={compact ? 'sm' : 'default'}
           className={cn(
-            'min-h-[44px] cursor-pointer',
+            'cursor-pointer',
             compact
-              ? 'w-auto border-0 bg-white/80 hover:bg-white hover:shadow-sm focus:bg-white focus:shadow-md dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
-              : 'w-full'
+              ? 'w-auto h-10 border-0 bg-gray-50 hover:bg-gray-100 hover:shadow-sm focus:bg-white focus:shadow-md dark:bg-white/10 dark:hover:bg-white/15 dark:focus:bg-white/20'
+              : 'w-full min-h-[48px]'
           )}
         >
           <SelectValue placeholder="Klasse wählen">

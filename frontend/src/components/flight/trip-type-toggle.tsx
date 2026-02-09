@@ -41,7 +41,7 @@ export function TripTypeToggle({ value, onChange, className }: TripTypeTogglePro
             aria-checked={isActive}
             onClick={() => onChange(type.value)}
             className={cn(
-              'relative rounded-full px-3 py-2 text-xs font-medium transition-colors min-h-[44px] cursor-pointer sm:px-4 sm:text-sm',
+              'relative rounded-full px-3 py-2 text-xs font-medium transition-colors h-10 cursor-pointer sm:px-4 sm:text-sm',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2',
               isActive
                 ? 'text-gray-900 dark:text-white'
