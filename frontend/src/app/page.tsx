@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Plane, MapPin, TrendingUp, Shield } from 'lucide-react';
 import { SearchForm } from '@/components/flight/search-form';
+import { useSearchStore } from '@/stores/search-store';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -108,11 +109,18 @@ export default function HomePage() {
     const returnDate = new Date(departure);
     returnDate.setDate(returnDate.getDate() + 7);
 
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    // Set search store before navigating
+    const store = useSearchStore.getState();
+    store.setOrigin(originCode);
+    store.setOriginName(originCode);
+    store.setDestination(destCode);
+    store.setDestinationName(destCode);
+    store.setDepartureDate(departure);
+    store.setReturnDate(returnDate);
+    store.setTripType('roundtrip');
+    store.setAdults(1);
 
-    router.push(
-      `/results?origin=${originCode}&destination=${destCode}&departure=${fmt(departure)}&return=${fmt(returnDate)}&adults=1&tripType=roundtrip`
-    );
+    router.push('/results');
   };
 
   return (

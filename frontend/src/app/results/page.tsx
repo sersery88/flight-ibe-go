@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, Suspense } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Calendar, Users, Plane as PlaneIcon, Search, ArrowRightLeft, Edit2, SlidersHorizontal, X } from 'lucide-react';
@@ -442,6 +442,20 @@ function ResultsContent() {
 
   const [showSearchForm, setShowSearchForm] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const autoSearchTriggered = useRef(false);
+
+  // Auto-search when navigating from homepage with store data but no results
+  useEffect(() => {
+    if (autoSearchTriggered.current) return;
+    if (searchResults.length > 0) return;
+    if (isSearchPending) return;
+    const request = store.getSearchRequest();
+    if (!request) return;
+    autoSearchTriggered.current = true;
+    searchFlights(request, {
+      onSuccess: (data) => store.setSearchResults(data.data),
+    });
+  }, [store, searchResults, isSearchPending, searchFlights]);
   const [sortBy, setSortBy] = useState<SortTabOption>('best');
   const [filters, setFilters] = useState<FlightFilters>(DEFAULT_FILTERS);
   const [selectedOfferId, setSelectedOfferId] = useState<string>();
