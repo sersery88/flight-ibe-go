@@ -42,7 +42,7 @@ const POPULAR_ROUTES: OriginGroup[] = [
     origin: 'Basel',
     originCode: 'BSL',
     routes: [
-      { city: 'Mallorca', destinationCode: 'PMI', country: 'Spanien', image: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=400&h=250&fit=crop' },
+      { city: 'Mallorca', destinationCode: 'PMI', country: 'Spanien', image: 'https://images.unsplash.com/photo-1633043855073-f3a95b6b1e6c?w=400&h=250&fit=crop' },
       { city: 'London', destinationCode: 'LHR', country: 'Großbritannien', image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=250&fit=crop' },
       { city: 'Berlin', destinationCode: 'BER', country: 'Deutschland', image: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=400&h=250&fit=crop' },
       { city: 'Amsterdam', destinationCode: 'AMS', country: 'Niederlande', image: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400&h=250&fit=crop' },
