@@ -22,7 +22,8 @@ export function formatCurrency(amount: string | number, currency = 'EUR'): strin
 /**
  * Format duration from ISO 8601 (PT2H30M) to human readable (2h 30m)
  */
-export function formatDuration(isoDuration: string): string {
+export function formatDuration(isoDuration: string | undefined | null): string {
+  if (!isoDuration) return '—';
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
   if (!match) return isoDuration;
 
@@ -35,7 +36,8 @@ export function formatDuration(isoDuration: string): string {
 /**
  * Parse ISO 8601 duration (PT2H30M) to minutes
  */
-export function parseDuration(isoDuration: string): number {
+export function parseDuration(isoDuration: string | undefined | null): number {
+  if (!isoDuration) return 0;
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
   if (!match) return 0;
 
