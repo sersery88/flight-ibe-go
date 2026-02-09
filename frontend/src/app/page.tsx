@@ -136,7 +136,7 @@ export default function HomePage() {
           <div className="absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-gray-100/30 blur-3xl dark:bg-gray-800/10" />
         </div>
 
-        <div className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-10 sm:pb-16 sm:pt-20 md:pb-20 md:pt-28">
+        <div className="relative mx-auto w-full max-w-3xl px-4 pb-10 pt-10 sm:pb-16 sm:pt-20 md:pb-20 md:pt-28 lg:max-w-4xl">
           {/* Hero Text */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

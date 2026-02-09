@@ -70,7 +70,7 @@ export function SearchForm({ onSearch, onSearchComplete, className }: SearchForm
   const isSearchDisabled = isPending || !store.origin || !store.destination || !store.departureDate;
 
   return (
-    <div className={cn('space-y-5 md:max-w-4xl md:mx-auto', className)}>
+    <div className={cn('space-y-5', className)}>
       {/* Top Row: Trip Type + Passengers + Class */}
       <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex justify-center sm:justify-start">
