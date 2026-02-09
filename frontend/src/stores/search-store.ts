@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist, devtools, createJSONStorage } from 'zustand/middleware';
+import { persist, devtools } from 'zustand/middleware';
 import { useEffect, useState } from 'react';
 import type { FlightSearchRequest, FlightOffer, TravelClass } from '@/types/flight';
 
@@ -186,32 +186,50 @@ export const useSearchStore = create<SearchState>()(
     }),
       {
         name: 'flight-search',
-        storage: createJSONStorage(() => localStorage),
-        skipHydration: true, // Important for Next.js SSR compatibility
+        storage: {
+          getItem: (name) => {
+            const raw = localStorage.getItem(name);
+            if (!raw) return null;
+            try {
+              const parsed = JSON.parse(raw);
+              // Convert ISO date strings back to Date objects
+              if (parsed?.state) {
+                if (parsed.state.departureDate && typeof parsed.state.departureDate === 'string') {
+                  parsed.state.departureDate = new Date(parsed.state.departureDate);
+                }
+                if (parsed.state.returnDate && typeof parsed.state.returnDate === 'string') {
+                  parsed.state.returnDate = new Date(parsed.state.returnDate);
+                }
+              }
+              return parsed;
+            } catch {
+              return null;
+            }
+          },
+          setItem: (name, value) => {
+            // Serialize dates to ISO strings for JSON storage
+            const clone = JSON.parse(JSON.stringify(value, (_key, val) => {
+              if (val instanceof Date) return val.toISOString();
+              return val;
+            }));
+            localStorage.setItem(name, JSON.stringify(clone));
+          },
+          removeItem: (name) => localStorage.removeItem(name),
+        },
+        skipHydration: true,
         partialize: (state) => ({
           tripType: state.tripType,
           origin: state.origin,
           originName: state.originName,
           destination: state.destination,
           destinationName: state.destinationName,
-          departureDate: state.departureDate ? state.departureDate.toISOString() : null,
-          returnDate: state.returnDate ? state.returnDate.toISOString() : null,
+          departureDate: state.departureDate,
+          returnDate: state.returnDate,
           adults: state.adults,
           children: state.children,
           infants: state.infants,
           travelClass: state.travelClass,
-        }),
-        onRehydrateStorage: () => (state) => {
-          // Convert ISO date strings back to Date objects after rehydration
-          if (state) {
-            if (state.departureDate && typeof state.departureDate === 'string') {
-              state.departureDate = new Date(state.departureDate);
-            }
-            if (state.returnDate && typeof state.returnDate === 'string') {
-              state.returnDate = new Date(state.returnDate);
-            }
-          }
-        },
+        }) as unknown as SearchState,
       }
     ),
     { name: 'SearchStore', enabled: process.env.NODE_ENV === 'development' }
