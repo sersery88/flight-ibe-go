@@ -188,18 +188,15 @@ export const useSearchStore = create<SearchState>()(
         name: 'flight-search',
         storage: {
           getItem: (name) => {
-            const raw = localStorage.getItem(name);
-            if (!raw) return null;
             try {
+              const raw = localStorage.getItem(name);
+              if (!raw) return null;
               const parsed = JSON.parse(raw);
-              // Convert ISO date strings back to Date objects
+              // Convert timestamps back to Date objects
               if (parsed?.state) {
-                if (parsed.state.departureDate && typeof parsed.state.departureDate === 'string') {
-                  parsed.state.departureDate = new Date(parsed.state.departureDate);
-                }
-                if (parsed.state.returnDate && typeof parsed.state.returnDate === 'string') {
-                  parsed.state.returnDate = new Date(parsed.state.returnDate);
-                }
+                const s = parsed.state;
+                if (s.departureDate != null) s.departureDate = new Date(s.departureDate);
+                if (s.returnDate != null) s.returnDate = new Date(s.returnDate);
               }
               return parsed;
             } catch {
@@ -207,14 +204,19 @@ export const useSearchStore = create<SearchState>()(
             }
           },
           setItem: (name, value) => {
-            // Serialize dates to ISO strings for JSON storage
-            const clone = JSON.parse(JSON.stringify(value, (_key, val) => {
-              if (val instanceof Date) return val.toISOString();
-              return val;
-            }));
-            localStorage.setItem(name, JSON.stringify(clone));
+            try {
+              // Convert Dates to timestamps before JSON serialization
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const v = value as any;
+              if (v?.state) {
+                const s = v.state;
+                if (s.departureDate instanceof Date) s.departureDate = s.departureDate.getTime();
+                if (s.returnDate instanceof Date) s.returnDate = s.returnDate.getTime();
+              }
+              localStorage.setItem(name, JSON.stringify(value));
+            } catch { /* quota exceeded etc */ }
           },
-          removeItem: (name) => localStorage.removeItem(name),
+          removeItem: (name) => { try { localStorage.removeItem(name); } catch {} },
         },
         skipHydration: true,
         partialize: (state) => ({
