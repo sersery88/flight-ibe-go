@@ -57,14 +57,13 @@ export function useUpsellOffers(
     }
   }, [enabled, fetchUpsellOffers, upsellOffers.length, isLoading, hasFailed]);
 
-  // Combine original offer with upsell offers, deduplicated by fare code
+  // Combine original offer with upsell offers, deduplicated by branded fare name
   const allFareOptions = useMemo(() => {
     if (upsellOffers.length === 0) return [offer];
 
     const fareMap = new Map<string, FlightOffer>();
-    const originalFare = offer.travelerPricings[0]?.fareDetailsBySegment[0]?.brandedFare || 'ORIGINAL';
-    fareMap.set(originalFare, offer);
 
+    // Add all upsell offers first (authoritative pricing)
     for (const upsellOffer of upsellOffers) {
       const fareCode = upsellOffer.travelerPricings[0]?.fareDetailsBySegment[0]?.brandedFare || upsellOffer.id;
       const existing = fareMap.get(fareCode);
@@ -73,6 +72,12 @@ export function useUpsellOffers(
       if (!existing || parseFloat(upsellOffer.price.total) < parseFloat(existing.price.total)) {
         fareMap.set(fareCode, upsellOffer);
       }
+    }
+
+    // Only add original if its fare code isn't already covered by upsell
+    const originalFare = offer.travelerPricings[0]?.fareDetailsBySegment[0]?.brandedFare || 'ORIGINAL';
+    if (!fareMap.has(originalFare)) {
+      fareMap.set(originalFare, offer);
     }
 
     // Sort by price ascending
