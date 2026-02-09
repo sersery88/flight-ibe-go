@@ -205,15 +205,18 @@ export const useSearchStore = create<SearchState>()(
           },
           setItem: (name, value) => {
             try {
-              // Convert Dates to timestamps before JSON serialization
+              // Clone state to avoid mutating live store, then convert Dates
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const v = value as any;
-              if (v?.state) {
-                const s = v.state;
-                if (s.departureDate instanceof Date) s.departureDate = s.departureDate.getTime();
-                if (s.returnDate instanceof Date) s.returnDate = s.returnDate.getTime();
+              const toStore = {
+                ...v,
+                state: v?.state ? { ...v.state } : v?.state,
+              };
+              if (toStore.state) {
+                if (toStore.state.departureDate instanceof Date) toStore.state.departureDate = toStore.state.departureDate.getTime();
+                if (toStore.state.returnDate instanceof Date) toStore.state.returnDate = toStore.state.returnDate.getTime();
               }
-              localStorage.setItem(name, JSON.stringify(value));
+              localStorage.setItem(name, JSON.stringify(toStore));
             } catch { /* quota exceeded etc */ }
           },
           removeItem: (name) => { try { localStorage.removeItem(name); } catch {} },
