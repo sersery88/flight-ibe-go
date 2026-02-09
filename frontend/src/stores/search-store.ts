@@ -189,15 +189,29 @@ export const useSearchStore = create<SearchState>()(
         storage: createJSONStorage(() => localStorage),
         skipHydration: true, // Important for Next.js SSR compatibility
         partialize: (state) => ({
+          tripType: state.tripType,
           origin: state.origin,
           originName: state.originName,
           destination: state.destination,
           destinationName: state.destinationName,
+          departureDate: state.departureDate ? state.departureDate.toISOString() : null,
+          returnDate: state.returnDate ? state.returnDate.toISOString() : null,
           adults: state.adults,
           children: state.children,
           infants: state.infants,
           travelClass: state.travelClass,
         }),
+        onRehydrateStorage: () => (state) => {
+          // Convert ISO date strings back to Date objects after rehydration
+          if (state) {
+            if (state.departureDate && typeof state.departureDate === 'string') {
+              state.departureDate = new Date(state.departureDate);
+            }
+            if (state.returnDate && typeof state.returnDate === 'string') {
+              state.returnDate = new Date(state.returnDate);
+            }
+          }
+        },
       }
     ),
     { name: 'SearchStore', enabled: process.env.NODE_ENV === 'development' }
