@@ -14,6 +14,7 @@ import { formatAircraftType } from '@/lib/aircraft';
 import { formatAirlineName } from '@/lib/airlines';
 import { formatAirportName } from '@/lib/airports';
 import type { FlightOffer, Segment } from '@/types/flight';
+import { useSearchStore } from '@/stores/search-store';
 
 // ============================================================================
 // Baggage Display — Smart Logic
@@ -175,13 +176,31 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFareSelection, setShowFareSelection] = useState(false);
   const [selectedFareOffer, setSelectedFareOffer] = useState<FlightOffer>(offer);
+  const [showAllFares, setShowAllFares] = useState(false);
+
+  const { travelClass: searchedCabinClass } = useSearchStore();
 
   const {
     isLoading: isLoadingUpsell,
     hasFailed: upsellFailed,
     hasMultipleFares,
-    allFareOptions
+    allFareOptions: allFareOptionsRaw
   } = useUpsellOffers(offer, { enabled: showFareSelection });
+
+  // Filter fare options by the searched cabin class
+  const { filteredFareOptions, allFareOptions, hasHiddenFares } = useMemo(() => {
+    const filtered = allFareOptionsRaw.filter((fareOffer) => {
+      const cabin = fareOffer.travelerPricings[0]?.fareDetailsBySegment?.[0]?.cabin;
+      return cabin === searchedCabinClass;
+    });
+    return {
+      filteredFareOptions: filtered.length > 0 ? filtered : allFareOptionsRaw,
+      allFareOptions: allFareOptionsRaw,
+      hasHiddenFares: filtered.length > 0 && filtered.length < allFareOptionsRaw.length,
+    };
+  }, [allFareOptionsRaw, searchedCabinClass]);
+
+  const displayedFareOptions = showAllFares ? allFareOptions : filteredFareOptions;
 
   const outbound = offer.itineraries[0];
   const returnFlight = offer.itineraries[1];
@@ -407,16 +426,36 @@ export const FlightCard = memo(function FlightCard({ offer, onSelect, isSelected
                       <span className="ml-2 text-xs text-muted-foreground">Tarife werden geladen...</span>
                     </div>
                   ) : hasMultipleFares ? (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {allFareOptions.map((fareOffer) => (
-                        <FareTile
-                          key={fareOffer.id}
-                          offer={fareOffer}
-                          isSelected={selectedFareOffer.id === fareOffer.id}
-                          onSelect={() => handleSelectFare(fareOffer)}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {displayedFareOptions.map((fareOffer) => (
+                          <FareTile
+                            key={fareOffer.id}
+                            offer={fareOffer}
+                            isSelected={selectedFareOffer.id === fareOffer.id}
+                            onSelect={() => handleSelectFare(fareOffer)}
+                          />
+                        ))}
+                      </div>
+                      {hasHiddenFares && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowAllFares(prev => !prev); }}
+                          className="mt-2 flex items-center gap-1 text-[11px] font-medium text-pink-500 hover:text-pink-600 transition-colors"
+                        >
+                          {showAllFares ? (
+                            <>
+                              <ChevronUp className="h-3 w-3" />
+                              Nur {getCabinLabel(searchedCabinClass)}-Tarife anzeigen
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3 w-3" />
+                              Alle Kabinen anzeigen (Upgrade-Optionen)
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <p className="py-2 text-xs text-muted-foreground">
                       Keine weiteren Tarife verfügbar.
