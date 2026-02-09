@@ -383,7 +383,7 @@ export function SeatmapModal({
               'fixed z-50 flex flex-col bg-background',
               'inset-0',
               'md:inset-auto md:top-[50%] md:left-[50%] md:translate-x-[-50%] md:translate-y-[-50%]',
-              'md:w-full md:max-w-5xl md:max-h-[85vh] md:rounded-2xl md:border md:border-border md:shadow-2xl',
+              'md:w-full md:max-w-3xl lg:max-w-5xl md:max-h-[90vh] md:rounded-2xl md:border md:border-border md:shadow-2xl',
               'data-[open]:animate-in data-[closed]:animate-out',
               'data-[open]:slide-in-from-bottom data-[closed]:slide-out-to-bottom',
               'md:data-[open]:slide-in-from-bottom-0 md:data-[closed]:slide-out-to-bottom-0',
@@ -493,67 +493,95 @@ export function SeatmapModal({
                   onSeatTapMobile={handleSeatTapMobile}
                 />
               )}
-            </div>
 
-            {/* ---- LEGEND (collapsible on mobile) ---- */}
-            {!isLoading && !isError && activeSegment && (
-              <div className="border-t border-border shrink-0">
-                {/* Mobile: collapsible */}
-                <div className="md:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setLegendOpen(!legendOpen)}
-                    className={[
-                      'flex items-center justify-between w-full px-4 py-2.5 text-xs font-medium transition-colors',
-                      legendOpen
-                        ? 'text-muted-foreground hover:bg-muted/50'
-                        : 'text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/30 hover:bg-pink-100 dark:hover:bg-pink-950/50',
-                    ].join(' ')}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {!legendOpen && <span className="text-sm">🎛️</span>}
-                      <span>Sitzplatz-Filter</span>
-                      {activeFilter && (
-                        <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
-                          aktiv
-                        </span>
-                      )}
-                    </span>
-                    {legendOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                  </button>
-                  <AnimatePresence>
-                    {legendOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden px-4 pb-3"
-                      >
-                        <Legend
-                          availableCategories={availableCategories}
-                          activeFilter={activeFilter}
-                          onFilterChange={setActiveFilter}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                {/* Desktop: always visible */}
-                <div className="hidden md:block px-6 py-3">
+              {/* ---- DESKTOP: Legend + Buttons INSIDE scroll area ---- */}
+              {!isLoading && !isError && activeSegment && (
+                <div className="hidden md:block mt-6 border-t border-border pt-4">
                   <Legend
                     availableCategories={availableCategories}
                     activeFilter={activeFilter}
                     onFilterChange={setActiveFilter}
                   />
+
+                  {Object.keys(segmentSelections).length > 0 && (
+                    <div className="mt-4">
+                      <SelectionSummary
+                        selections={segmentSelections}
+                        travelers={eligibleTravelers}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 mt-4 pb-2">
+                    <button
+                      type="button"
+                      onClick={handleSkip}
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-6 py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                    >
+                      Überspringen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirm}
+                      className="flex-1 inline-flex items-center justify-center rounded-xl bg-pink-500 px-8 py-3 text-sm font-semibold text-white hover:bg-pink-600 transition-colors shadow-lg shadow-pink-500/20"
+                    >
+                      {totalCost > 0
+                        ? `Bestätigen · ${totalCost.toFixed(2)} ${currency}`
+                        : 'Bestätigen'}
+                    </button>
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* ---- MOBILE: LEGEND (collapsible, outside scroll) ---- */}
+            {!isLoading && !isError && activeSegment && (
+              <div className="border-t border-border shrink-0 md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setLegendOpen(!legendOpen)}
+                  className={[
+                    'flex items-center justify-between w-full px-4 py-2.5 text-xs font-medium transition-colors',
+                    legendOpen
+                      ? 'text-muted-foreground hover:bg-muted/50'
+                      : 'text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/30 hover:bg-pink-100 dark:hover:bg-pink-950/50',
+                  ].join(' ')}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {!legendOpen && <span className="text-sm">🎛️</span>}
+                    <span>Sitzplatz-Filter</span>
+                    {activeFilter && (
+                      <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-pink-500/10 text-pink-500 px-1.5 py-0.5 text-[10px]">
+                        aktiv
+                      </span>
+                    )}
+                  </span>
+                  {legendOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                </button>
+                <AnimatePresence>
+                  {legendOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden px-4 pb-3"
+                    >
+                      <Legend
+                        availableCategories={availableCategories}
+                        activeFilter={activeFilter}
+                        onFilterChange={setActiveFilter}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
-            {/* ---- FOOTER (sticky) ---- */}
-            <div className="sticky bottom-0 z-10 bg-background border-t border-border shrink-0">
+            {/* ---- MOBILE: FOOTER (outside scroll) ---- */}
+            <div className="bg-background border-t border-border shrink-0 md:hidden">
               {Object.keys(segmentSelections).length > 0 && (
-                <div className="px-4 pt-3 md:px-6">
+                <div className="px-4 pt-3">
                   <SelectionSummary
                     selections={segmentSelections}
                     travelers={eligibleTravelers}
@@ -561,18 +589,18 @@ export function SeatmapModal({
                 </div>
               )}
 
-              <div className="flex items-center gap-3 px-4 py-3 md:px-6">
+              <div className="flex items-center gap-3 px-4 py-3">
                 <button
                   type="button"
                   onClick={handleSkip}
-                  className="flex-1 md:flex-none inline-flex items-center justify-center rounded-xl border border-border bg-background px-5 py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  className="flex-1 inline-flex items-center justify-center rounded-xl border border-border bg-background px-5 py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
                   Überspringen
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  className="flex-[2] md:flex-1 inline-flex items-center justify-center rounded-xl bg-pink-500 px-6 py-3 text-sm font-semibold text-white hover:bg-pink-600 transition-colors shadow-lg shadow-pink-500/20"
+                  className="flex-[2] inline-flex items-center justify-center rounded-xl bg-pink-500 px-6 py-3 text-sm font-semibold text-white hover:bg-pink-600 transition-colors shadow-lg shadow-pink-500/20"
                 >
                   {totalCost > 0
                     ? `Bestätigen · ${totalCost.toFixed(2)} ${currency}`

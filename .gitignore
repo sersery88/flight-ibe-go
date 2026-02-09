@@ -37,3 +37,4 @@ frontend/.next/
 flight-backend
 
 frontend/node_modules/
+.next/

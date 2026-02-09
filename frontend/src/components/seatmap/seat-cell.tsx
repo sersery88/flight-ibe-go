@@ -124,7 +124,7 @@ export const SeatCell = React.memo(function SeatCell({
 
   const size = compact
     ? 'min-w-[36px] min-h-[36px] w-9 h-9 text-[10px]'
-    : 'min-w-[40px] min-h-[40px] w-10 h-10 text-xs';
+    : 'min-w-[40px] min-h-[40px] w-10 h-10 md:min-w-[48px] md:min-h-[48px] md:w-12 md:h-12 text-xs md:text-sm';
 
   return (
     <button

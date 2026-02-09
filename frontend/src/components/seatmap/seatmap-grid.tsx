@@ -208,14 +208,16 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
 
       {/* Grid */}
       <div
-        className="relative overflow-x-auto pb-2"
+        className="relative overflow-x-auto pb-2 md:flex md:justify-center"
         role="grid"
         aria-label="Sitzplan"
       >
         <div
-          className="inline-grid gap-1 items-center justify-items-center"
+          className="inline-grid gap-1 md:gap-1.5 items-center justify-items-center"
           style={{
-            gridTemplateColumns: `${exitRows.size > 0 ? '64px' : '40px'} repeat(${totalCols - 2}, minmax(${compact ? '36px' : '40px'}, 1fr)) ${exitRows.size > 0 ? '48px' : '40px'}`,
+            gridTemplateColumns: isMobile
+              ? `${exitRows.size > 0 ? '64px' : '40px'} repeat(${totalCols - 2}, minmax(${compact ? '36px' : '40px'}, 1fr)) ${exitRows.size > 0 ? '48px' : '40px'}`
+              : `${exitRows.size > 0 ? '72px' : '48px'} repeat(${totalCols - 2}, minmax(${compact ? '44px' : '52px'}, 1fr)) ${exitRows.size > 0 ? '56px' : '48px'}`,
           }}
         >
           {/* Row 1: Column labels */}
@@ -226,7 +228,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             return (
               <div
                 key={`col-${y}`}
-                className="text-xs font-semibold text-muted-foreground"
+                className="text-xs md:text-sm font-semibold text-muted-foreground"
                 style={{ gridRow: 1, gridColumn: gc }}
               >
                 {getColumnLabel(i, columns)}
@@ -272,14 +274,14 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
                       <span className="text-[6px] font-black text-white tracking-wider leading-none">EXIT</span>
                     </span>
                   )}
-                  <span className="text-xs font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
+                  <span className="text-xs md:text-sm font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
                 </div>
                 {/* Right side: row number + exit badge */}
                 <div
                   className="flex items-center justify-start gap-1 pl-1 w-full"
                   style={{ gridRow, gridColumn: rightLabelCol }}
                 >
-                  <span className="text-xs font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
+                  <span className="text-xs md:text-sm font-medium text-muted-foreground shrink-0">{xToRowLabel.get(rowNum) ?? rowNum}</span>
                   {isExit && (
                     <span className="inline-flex items-center rounded bg-emerald-600 px-0.5 py-px shadow-sm shadow-emerald-500/30 animate-pulse shrink-0">
                       <span className="text-[6px] font-black text-white tracking-wider leading-none">EXIT</span>
@@ -390,7 +392,7 @@ export const SeatmapGrid = React.memo(function SeatmapGrid({
             Array.from(rowMap.values()).map((gr) => (
               <div
                 key={`aisle-${gc}-${gr}`}
-                className="w-3"
+                className="w-3 md:w-6"
                 style={{ gridRow: gr, gridColumn: gc }}
               />
             ))
